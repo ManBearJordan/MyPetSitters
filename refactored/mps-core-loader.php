@@ -7,11 +7,8 @@
 
 if (!defined('ABSPATH')) exit;
 
-// Force Menu Setup (Runs on init) - DISABLED FOR STABILITY
-// require_once plugin_dir_path(__FILE__) . 'force-menu-setup.php';
-
-// Force Page Content Fix (Runs on init) - DISABLED FOR STABILITY
-// require_once plugin_dir_path(__FILE__) . 'force-page-fix.php';
+// Force Menu Setup (Runs on init) - REMOVED during cleanup
+// Force Page Content Fix (Runs on init) - REMOVED during cleanup
 
 $core_files = [
     '1-mps-core.php',
