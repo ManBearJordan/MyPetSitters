@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  wordpress:
+    image: wordpress:latest
+    container_name: mps-wordpress
+    ports:
+      - "8888:80"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DEBUG: 1
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./refactored:/var/www/html/wp-content/plugins/mps-core-loader
+      - ./apache-wordpress.conf:/etc/apache2/conf-available/wordpress.conf
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    container_name: mps-mysql
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_ROOT_HOST: '%'
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: mps-phpmyadmin
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: db
+      PMA_USER: wordpress
+      PMA_PASSWORD: wordpress
+    depends_on:
+      - db
+    restart: unless-stopped
+
+volumes:
+  wordpress_data:
+  db_data:
