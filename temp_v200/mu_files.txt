@@ -1,0 +1,8 @@
+mps-.php
+mps-admin.php
+mps-auth.php
+mps-dashboard.php
+mps-homepage.php
+mps-loader.php
+mps-pages.php
+mps-sitter-profiles.php
