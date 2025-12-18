@@ -11,6 +11,7 @@
 
 if (!defined('ABSPATH')) exit;
 
+if (!function_exists('antigravity_v200_get_master_suburbs_list')) {
 function antigravity_v200_get_master_suburbs_list() {
     // A comprehensive list of common suburbs. 
     // NOTE: This is a large representative list. 
@@ -64,6 +65,7 @@ function antigravity_v200_get_master_suburbs_list() {
         'Darwin', 'Palmerston', 'Katherine', 'Alice Springs',
         'Canberra', 'Queanbeyan', 'Gungahlin', 'Belconnen', 'Woden', 'Tuggeranong'
     ];
+}
 }
 
 /**

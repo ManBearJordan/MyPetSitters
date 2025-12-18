@@ -4,6 +4,7 @@
  * Used for Datalists and Validation
  */
 
+if (!function_exists('antigravity_v200_get_valid_locations')) {
 function antigravity_v200_get_valid_locations() {
     return [
         // CAPITAL CITIES
@@ -55,7 +56,9 @@ function antigravity_v200_get_valid_locations() {
         'Redcliffe',
     ];
 }
+}
 
+if (!function_exists('antigravity_v200_get_valid_regions')) {
 function antigravity_v200_get_valid_regions() {
     return [
         'NSW' => [
@@ -91,11 +94,13 @@ function antigravity_v200_get_valid_regions() {
         ]
     ];
 }
+}
 
 /**
  * Get Structured Search Options
  * Returns: ['Major Cities' => [...], 'NSW' => [...], ...]
  */
+if (!function_exists('antigravity_v200_get_search_options')) {
 function antigravity_v200_get_search_options() {
     // Top-tier locations the user likely wants to find quickly
     $cities = [
@@ -124,6 +129,7 @@ function antigravity_v200_get_search_options() {
     }
     
     return $options;
+}
 }
 
 /**

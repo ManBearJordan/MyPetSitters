@@ -15,12 +15,20 @@ if (!defined('ABSPATH')) exit;
 
 
 function antigravity_v200_installer() {
+    // 0. CLEANUP LEGACY SNIPPETS (Prevents Fatal Errors)
+    $old_dir = WP_CONTENT_DIR . '/mps-snippets/';
+    $backup_dir = WP_CONTENT_DIR . '/mps-snippets-backup-' . time() . '/';
+    if (is_dir($old_dir)) {
+        @rename($old_dir, $backup_dir);
+    }
+
     // 1. CREATE PAGES
     $pages = [
         'login' => [
             'title' => 'Login',
             'content' => '[mps_login]'
         ],
+
         'join' => [
             'title' => 'Join',
             'content' => '[mps_register]' // Corrected from mps_registration

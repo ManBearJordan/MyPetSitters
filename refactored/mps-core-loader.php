@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: MPS Core Loader - FIXED
- * Description: Safely loads the MPS Core snippet from mps-snippets. (v2.45.0 - PROFILE SKILLS)
+ * Description: Safely loads the MPS Core files from the plugin directory. (v2.45.0 - PROFILE SKILLS)
  * Version: 2.45.0
  */
 

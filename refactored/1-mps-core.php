@@ -618,16 +618,19 @@ add_action('wp_head', function() {
 /**
  * Helper to get sitter thumbnail
  */
+if (!function_exists('antigravity_v200_get_sitter_thumbnail')) {
 function antigravity_v200_get_sitter_thumbnail($post_id, $size = 'large') {
     if (has_post_thumbnail($post_id)) {
         return get_the_post_thumbnail_url($post_id, 'full');
     }
     return ''; // Or return a default image URL
 }
+}
 
 /**
  * Helper: Get Lowest Price for Sitter
  */
+if (!function_exists('antigravity_v200_get_lowest_price')) {
 function antigravity_v200_get_lowest_price($post_id) {
     if (!function_exists('antigravity_v200_services_map')) return 0;
     
@@ -643,10 +646,12 @@ function antigravity_v200_get_lowest_price($post_id) {
     
     return ($min_price < 99999) ? $min_price : 0;
 }
+}
 
 /**
  * Helper: Get Sitter Post for User
  */
+if (!function_exists('antigravity_v200_get_sitter_post')) {
 function antigravity_v200_get_sitter_post($user_id) {
     if (!$user_id) return null;
     $posts = get_posts([
@@ -657,9 +662,11 @@ function antigravity_v200_get_sitter_post($user_id) {
     ]);
     return !empty($posts) ? $posts[0] : null;
 }
+}
 /**
  * Get the services map (label => slug)
  */
+if (!function_exists('antigravity_v200_services_map')) {
 function antigravity_v200_services_map() {
     return [
         'Dog Walking'     => 'dog-walking',
@@ -668,21 +675,25 @@ function antigravity_v200_services_map() {
         'Home Visits'     => 'home-visits',
     ];
 }
+}
 
 /**
  * Get list of supported cities
  * NOW USES MASTER LIST (V84)
  */
+if (!function_exists('antigravity_v200_cities_list')) {
 function antigravity_v200_cities_list() {
     if (function_exists('antigravity_v200_get_valid_locations')) {
         return antigravity_v200_get_valid_locations();
     }
     return ['Brisbane', 'Sydney', 'Melbourne', 'Perth', 'Adelaide'];
 }
+}
 
 /**
  * Normalize service labels to canonical form
  */
+if (!function_exists('antigravity_v200_normalise_services_labels')) {
 function antigravity_v200_normalise_services_labels($labels) {
     $allowed = array_keys(antigravity_v200_services_map());
     $clean = [];
@@ -708,27 +719,33 @@ function antigravity_v200_normalise_services_labels($labels) {
     
     return array_keys($clean);
 }
+}
 
 /**
  * Create URL-safe slug from text
  */
+if (!function_exists('antigravity_v200_slugify')) {
 function antigravity_v200_slugify($text) {
     $text = strtolower(remove_accents($text));
     $text = preg_replace('/[^a-z0-9]+/', '-', $text);
     return trim($text, '-');
 }
+}
 
 /**
  * Get service label from slug
  */
+if (!function_exists('antigravity_v200_service_slug_to_label')) {
 function antigravity_v200_service_slug_to_label($slug) {
     $map = array_flip(antigravity_v200_services_map()); // slug => label
     return $map[$slug] ?? ucwords(str_replace('-', ' ', $slug));
+}
 }
 
 /**
  * Helper to get sitter meta safely
  */
+if (!function_exists('antigravity_v200_get_sitter_meta')) {
 function antigravity_v200_get_sitter_meta($post_id) {
     return [
         'city'     => get_post_meta($post_id, 'mps_city', true),
@@ -744,6 +761,7 @@ function antigravity_v200_get_sitter_meta($post_id) {
         'location_type' => get_post_meta($post_id, 'mps_location_type', true),
         'radius'        => get_post_meta($post_id, 'mps_radius', true),
     ];
+}
 }
 
 // SECTION 3: REGISTER CUSTOM POST TYPE - SITTER
@@ -835,6 +853,7 @@ add_action('init', function() {
 /**
  * Get list of Australian States
  */
+if (!function_exists('antigravity_v200_states_list')) {
 function antigravity_v200_states_list() {
     return [
         'NSW' => 'New South Wales',
@@ -846,6 +865,7 @@ function antigravity_v200_states_list() {
         'ACT' => 'Australian Capital Territory',
         'NT'  => 'Northern Territory'
     ];
+}
 }
 
 // SECTION 5: CREATE PRO (SITTER) ROLE WITH CAPABILITIES
