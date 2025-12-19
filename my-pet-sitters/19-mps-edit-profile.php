@@ -463,7 +463,7 @@ function antigravity_v200_handle_profile_save() {
     }
 
     // V103: INLINED VALIDATION DATA
-    $region_input = sanitize_text_field($_POST['region']);
+    $region_input = isset($_POST['region']) ? sanitize_text_field($_POST['region']) : '';
     if ($region_input) {
         $structured_regions = [
             'NSW' => [
@@ -600,7 +600,7 @@ function antigravity_v200_handle_profile_save() {
 
         
         // Region Terms (V75)
-        $region = sanitize_text_field($_POST['region']);
+        $region = isset($_POST['region']) ? sanitize_text_field($_POST['region']) : '';
         if ($region) {
              $term_check = term_exists($region, 'mps_region');
              $term_id = 0;

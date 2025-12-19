@@ -1038,6 +1038,9 @@ function antigravity_v200_render_homepage($atts) {
                         <?php
                         // V104: PREFER REGION
                         $region_term = wp_get_post_terms($sitter->ID, 'mps_region', ['fields' => 'names']);
+                        if (is_wp_error($region_term)) {
+                            $region_term = [];
+                        }
                         $region_name = !empty($region_term) ? $region_term[0] : '';
                         
                         $loc_str = $city;
