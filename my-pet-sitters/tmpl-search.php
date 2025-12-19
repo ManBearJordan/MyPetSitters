@@ -44,17 +44,24 @@ $count = $wp_query->found_posts;
                 $thumb = antigravity_v200_get_sitter_thumbnail($ID);
                 $city_meta = get_post_meta($ID, 'mps_city', true);
                 $suburb_meta = get_post_meta($ID, 'mps_suburb', true);
-                $price = antigravity_v200_get_lowest_price($ID); // Helper if exists, or manual
                 
-                // Manual Price Logic (Reuse from V80)
-                if (!function_exists('antigravity_v200_get_lowest_price')) {
-                     $min_price = 99999;
-                     $services_map = antigravity_v200_services_map();
-                     foreach ($services_map as $svc_slug) {
-                         $p = get_post_meta($ID, 'mps_price_' . $svc_slug, true);
-                         if ($p && is_numeric($p) && $p > 0 && $p < $min_price) $min_price = $p;
-                     }
-                     $price = ($min_price < 99999) ? $min_price : '';
+                $price = '';
+                try {
+                    $price = antigravity_v200_get_lowest_price($ID); // Helper if exists, or manual
+                    
+                    // Manual Price Logic (Reuse from V80)
+                    if (!function_exists('antigravity_v200_get_lowest_price')) {
+                         $min_price = 99999;
+                         $services_map = antigravity_v200_services_map();
+                         foreach ($services_map as $svc_slug) {
+                             $p = get_post_meta($ID, 'mps_price_' . $svc_slug, true);
+                             if ($p && is_numeric($p) && $p > 0 && $p < $min_price) $min_price = $p;
+                         }
+                         $price = ($min_price < 99999) ? $min_price : '';
+                    }
+                } catch (Exception $e) {
+                     error_log('MPS Search Grid Error (ID '.$ID.'): ' . $e->getMessage());
+                     // Continue graceful failure (price remains empty string)
                 }
 
                 $loc = $suburb_meta ? "$suburb_meta, $city_meta" : $city_meta;

@@ -1725,7 +1725,7 @@ function antigravity_get_suburbs_handler() {
         wp_send_json_success($found_suburbs);
         
     } catch (Exception $e) {
-        // Log error (optional) and return strict failure
+        // Log error and return strict failure
         error_log('MPS AJAX Error: ' . $e->getMessage());
         wp_send_json_error(['message' => 'Internal Server Error']);
     }
