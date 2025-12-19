@@ -46,19 +46,21 @@ function antigravity_v200_edit_profile_shortcode($atts) {
     
     if ($sitter_post) {
         $meta = antigravity_v200_get_sitter_meta($sitter_post->ID);
-        $values['phone'] = $meta['phone'];
-        $values['city'] = $meta['city'];
-        $values['suburb'] = $meta['suburb'];
-        $values['state'] = $meta['state'];
-        $values['location_type'] = $meta['location_type'] ?: 'Urban';
-        $values['radius'] = $meta['radius'];
+        if (is_wp_error($meta)) $meta = [];
+
+        $values['phone'] = $meta['phone'] ?? '';
+        $values['city'] = $meta['city'] ?? '';
+        $values['suburb'] = $meta['suburb'] ?? '';
+        $values['state'] = $meta['state'] ?? '';
+        $values['location_type'] = !empty($meta['location_type']) ? $meta['location_type'] : 'Urban';
+        $values['radius'] = $meta['radius'] ?? '';
         
         // Get Region Term
         $regions = wp_get_post_terms($sitter_post->ID, 'mps_region', ['fields' => 'names']);
-        $values['region'] = !empty($regions) ? $regions[0] : '';
+        $values['region'] = !empty($regions) && !is_wp_error($regions) ? $regions[0] : '';
 
         $values['bio'] = $sitter_post->post_content;
-        $values['services'] = $meta['services'];
+        $values['services'] = $meta['services'] ?? [];
         $values['skills'] = get_post_meta($sitter_post->ID, 'mps_skills', true) ?: [];
         $values['accepted_pets'] = get_post_meta($sitter_post->ID, 'mps_accepted_pets', true) ?: [];
         $values['show_phone'] = get_post_meta($sitter_post->ID, 'mps_show_phone', true);

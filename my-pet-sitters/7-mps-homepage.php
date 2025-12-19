@@ -824,11 +824,10 @@ add_action('wp_head', function() {
 
 // Converted to named function// Converted to named function (V120 Fix)
 function antigravity_v200_render_homepage($atts) {
-    // Get Data Sources
-    $search_options = function_exists('antigravity_v200_get_search_options') ? antigravity_v200_get_search_options() : [];
+    // Get Services
     $services_map = function_exists('antigravity_v200_services_map') ? antigravity_v200_services_map() : [];
     
-    // Get featured sitters
+    // Get Featured Sitters
     $sitters = get_posts([
         'post_type' => 'sitter',
         'post_status' => 'publish',
@@ -836,31 +835,67 @@ function antigravity_v200_render_homepage($atts) {
         'orderby' => 'rand'
     ]);
     
+    // -----------------------------------------------------------
+    // DYNAMIC REGION LOGIC
+    // -----------------------------------------------------------
+    
+    // 1. Define the "Always Show" list (The Main 5)
+    // Ensure these match exactly what is in your database/optgroups
+    $pinned_locations = [
+        'Sydney', 
+        'Melbourne', 'Greater Melbourne', 
+        'Brisbane', 'Brisbane & Surrounds', 
+        'Perth', 'Perth & Peel', 
+        'Adelaide', 'Adelaide & Surrounds'
+    ];
+
+    // 2. Define Structure
+    $regions_by_state = [
+        'NSW' => ['Sydney', 'Hunter Region', 'Central Coast', 'Greater Western Sydney', 'Illawarra'],
+        'QLD' => ['Brisbane & Surrounds', 'Gold Coast', 'Sunshine Coast'],
+        'VIC' => ['Greater Melbourne', 'Mornington Peninsula'],
+        'WA'  => ['Perth & Peel'],
+        'SA'  => ['Adelaide & Surrounds']
+    ];
+
     ob_start();
     ?>
     <div class="mps-home-wrapper">
     
-    <!-- HERO SECTION -->
     <section class="mps-hero">
         <div class="mps-hero-content">
             <span class="sub-headline">Australia-wide directory of pet sitters & dog walkers</span>
             <h1>Find Trusted Pet Sitters & Dog Walkers Near You</h1>
             
-            <!-- Search Form (Refactored for Split Dropdowns) -->
             <form class="mps-search-box" action="/" method="get" onsubmit="return mpsSearch(this)">
+                
                 <select name="region" id="mps-region-select" onchange="mpsRegionChange()" required>
                     <option value="">Select Region...</option>
-                    <optgroup label="NSW">
-                        <option value="Hunter Region">Hunter Region</option>
-                        <option value="Central Coast">Central Coast</option>
-                        <option value="Greater Western Sydney">Greater Western Sydney</option>
-                        <option value="Sydney">Sydney (City)</option>
-                    </optgroup>
-                    <optgroup label="QLD">
-                        <option value="Brisbane & Surrounds">Brisbane & Surrounds</option>
-                        <option value="Gold Coast">Gold Coast</option>
-                    </optgroup>
-                    </select>
+                    <?php foreach ($regions_by_state as $state => $regions): ?>
+                        <optgroup label="<?= esc_attr($state) ?>">
+                            <?php foreach ($regions as $region_name): 
+                                // LOGIC: Should we show this region?
+                                $show = false;
+
+                                // Rule A: Is it pinned?
+                                if (in_array($region_name, $pinned_locations)) {
+                                    $show = true;
+                                } 
+                                // Rule B: Does it have active sitters?
+                                else {
+                                    $term = get_term_by('name', $region_name, 'mps_region');
+                                    if ($term && !is_wp_error($term) && $term->count > 0) {
+                                        $show = true;
+                                    }
+                                }
+
+                                if ($show):
+                            ?>
+                                <option value="<?= esc_attr($region_name) ?>"><?= esc_html($region_name) ?></option>
+                            <?php endif; endforeach; ?>
+                        </optgroup>
+                    <?php endforeach; ?>
+                </select>
                 
                 <div id="mps-suburb-wrapper" style="display:none; flex:1; border-left:1px solid #eee;">
                     <select name="suburb" id="mps-suburb-select" style="width:100%;">
@@ -878,7 +913,6 @@ function antigravity_v200_render_homepage($atts) {
                 <button type="submit" id="mps-hero-search-btn">Search</button>
             </form>
             
-            <!-- Trust Badges -->
             <div class="mps-trust-row">
                 <div class="mps-trust-item">
                     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L3 7v10l9 5 9-5V7l-9-5zm0 2.18l7 3.89v7.86l-7 3.89-7-3.89V8.07l7-3.89z"/><path d="M12 7a3 3 0 100 6 3 3 0 000-6z"/></svg>
@@ -888,18 +922,12 @@ function antigravity_v200_render_homepage($atts) {
                     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 6c1.4 0 2.8 1.1 2.8 2.5V11h1.7v5.5c0 .8-.7 1.5-1.5 1.5h-6c-.8 0-1.5-.7-1.5-1.5V11h1.7V9.5C9.2 8.1 10.6 7 12 7z"/></svg>
                     Secure Booking
                 </div>
-                <div class="mps-trust-item">
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-                    Quality Guaranteed
-                </div>
             </div>
         </div>
         
-        <!-- Pets Image -->
-        <img src="/wp-content/uploads/2025/12/pets-hero.png" alt="Happy cats and dogs" class="mps-hero-image">
+        <img src="/wp-content/uploads/2025/12/pets-hero.png" alt="Happy pets" class="mps-hero-image">
     </section>
     
-    <!-- SERVICES SECTION -->
     <section class="mps-services-section">
         <h2>What do you need?</h2>
         <p>Choose from our range of trusted pet care services</p>
@@ -927,158 +955,25 @@ function antigravity_v200_render_homepage($atts) {
         </div>
     </section>
 
-    <!-- WHY CHOOSE SECTION -->
-    <div class="mps-paw-divider reveal">
-        <img src="/wp-content/uploads/2025/12/mps-logo.png" alt="Paw Icon">
-    </div>
-    <section class="mps-section-columns" id="why-choose">
-        <div class="mps-col mps-img-container reveal">
-            <img src="/wp-content/uploads/2025/12/why-choose-illustration.png" alt="Why choose my pet sitters" class="mps-img-map">
-        </div>
-        <div class="mps-col mps-content-col reveal">
-            <h2>Why Choose My Pet Sitters</h2>
-            <p>We're an Australian local directory where real pet sitters list their services. Compare verified profiles, transparent pricing and genuine reviews of our pet sitters and dog walkers, then book securely with a sitter who fits your pet's needs.</p>
-            <p>All pet sitting and dog walking services are provided by each individual pet sitter, allowing you to find someone who works for you.</p>
-            <a href="#how-it-works" class="mps-link-arrow">How It Works →</a>
-            
-            <div class="mps-features-grid">
-                <div class="mps-feature">
-                    <h3><span>01</span> 5★ Reviews</h3>
-                    <p>Read genuine reviews from local pet owners before you book.</p>
-                </div>
-                <div class="mps-feature">
-                    <h3><span>02</span> Secure Booking</h3>
-                    <p>Clear pricing, simple messaging, and secure payment flow.</p>
-                </div>
-                <div class="mps-feature">
-                    <h3><span>03</span> Meet & Greet First</h3>
-                    <p>Message sitters and arrange a meet-and-greet to ensure the right fit.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Section Divider -->
-    <div class="mps-paw-divider reveal">
-        <img src="/wp-content/uploads/2025/12/mps-logo.png" alt="Paw Icon">
-    </div>
-
-    <!-- HOW IT WORKS SECTION -->
-    <section class="mps-section-columns mps-section-alt" id="how-it-works">
-        <div class="mps-col mps-content-col">
-            <h2>How My Pet Sitters works</h2>
-            <p>Book trusted local pet care in three simple steps:</p>
-            <div class="mps-steps-list">
-                <div class="mps-step">
-                    <div class="mps-step-icon">✔</div>
-                    <div class="mps-step-content">
-                        <h3>Step 1: Search sitters near you</h3>
-                        <p>Use the search to pick Daycare, Dog Walking, Overnight Stays or Home Visits, then filter by suburb, price and availability.</p>
-                    </div>
-                </div>
-                <div class="mps-step">
-                    <div class="mps-step-icon">✔</div>
-                    <div class="mps-step-content">
-                        <h3>Step 2: Message & meet first</h3>
-                        <p>Chat to confirm details and arrange a meet-and-greet to make sure it's the right fit.</p>
-                    </div>
-                </div>
-                <div class="mps-step">
-                    <div class="mps-step-icon">✔</div>
-                    <div class="mps-step-content">
-                        <h3>Step 3: Book securely & review</h3>
-                        <p>Lock in dates, pay securely, and leave a review to help other pet owners.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="mps-col mps-img-container">
-            <img src="/wp-content/uploads/2025/12/how-it-works-illustration.png" alt="How it works steps" class="mps-img-steps">
-        </div>
-    </section>
-    
-    <!-- FEATURED SITTERS -->
-    <?php if ($sitters): ?>
+    <?php if ($sitters && !is_wp_error($sitters)): ?>
     <section class="mps-featured-section">
         <h2>Featured Pet Sitters</h2>
-        <p>Meet some of our trusted pet carers</p>
         <div class="mps-sitter-grid-modern">
             <?php foreach ($sitters as $sitter): 
                 $city = get_post_meta($sitter->ID, 'mps_city', true);
-                $suburb = get_post_meta($sitter->ID, 'mps_suburb', true);
-                $services_list = get_post_meta($sitter->ID, 'mps_services', true);
-                $services_arr = array_map('trim', explode(',', $services_list));
-                $thumb = get_the_post_thumbnail_url($sitter->ID, 'full'); // V79 FULL RES IMAGE
-                
-                // V79 Price Scan Logic
-                $all_svcs_map = function_exists('antigravity_v200_services_map') ? antigravity_v200_services_map() : [];
-                $min_price = 99999;
-                
-                // Check all known service keys for prices
-                foreach ($all_svcs_map as $s_label => $s_slug) {
-                    $p_key = 'mps_price_' . $s_slug;
-                    $p_val = get_post_meta($sitter->ID, $p_key, true);
-                    if ($p_val && is_numeric($p_val) && $p_val > 0 && $p_val < $min_price) {
-                        $min_price = $p_val;
-                    }
-                }
-                $price = ($min_price < 99999) ? $min_price : 0;
-                
+                $thumb = get_the_post_thumbnail_url($sitter->ID, 'medium');
                 $name = explode(' - ', $sitter->post_title)[0];
             ?>
             <div class="mps-sitter-card-modern">
                 <?php if ($thumb): ?>
                     <img src="<?= esc_url($thumb) ?>" alt="<?= esc_attr($name) ?>" class="mps-sitter-photo">
                 <?php else: ?>
-                    <div class="mps-sitter-photo"></div>
+                    <div class="mps-sitter-photo" style="background:#eee;"></div>
                 <?php endif; ?>
                 <div class="mps-sitter-info">
                     <h3 class="mps-sitter-name"><?= esc_html($name) ?></h3>
-                    <p class="mps-sitter-location">
-                        <?php
-                        // V104: PREFER REGION
-                        $region_term = wp_get_post_terms($sitter->ID, 'mps_region', ['fields' => 'names']);
-                        if (is_wp_error($region_term)) {
-                            $region_term = [];
-                        }
-                        $region_name = !empty($region_term) ? $region_term[0] : '';
-                        
-                        $loc_str = $city;
-                        if ($suburb) {
-                            $loc_str = $region_name ? "$suburb, $region_name" : "$suburb, $city";
-                        } elseif ($region_name) {
-                            $loc_str = $region_name;
-                        }
-                        ?>
-                        📍 <?= esc_html($loc_str) ?>
-                    </p>
-                    <div class="mps-sitter-badges">
-                        <?php 
-                        $count = 0;
-                        foreach ($services_arr as $svc): 
-                            if ($count >= 2) break;
-                            $svc = trim($svc);
-                            if (!$svc) continue;
-                        ?>
-                            <span class="mps-badge"><?= esc_html($svc) ?></span>
-                        <?php 
-                            $count++;
-                        endforeach; 
-                        if (count($services_arr) > 2): ?>
-                            <span class="mps-badge coral">+<?= count($services_arr) - 2 ?> more</span>
-                        <?php endif; ?>
-                    </div>
-                    <div class="mps-sitter-price">
-                        <div>
-                            <?php if ($price > 0): ?>
-                                <span class="price">From $<?= esc_html($price) ?></span>
-                                <span class="label">per session</span>
-                            <?php else: ?>
-                                <span class="label">Contact for pricing</span>
-                            <?php endif; ?>
-                        </div>
-                        <a href="<?= get_permalink($sitter->ID) ?>" class="mps-view-btn">View</a>
-                    </div>
+                    <p class="mps-sitter-location">📍 <?= esc_html($city) ?></p>
+                    <a href="<?= get_permalink($sitter->ID) ?>" class="mps-view-btn">View Profile</a>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -1086,48 +981,7 @@ function antigravity_v200_render_homepage($atts) {
     </section>
     <?php endif; ?>
     
-    <!-- CITIES SECTION -->
-    <section class="mps-cities-section">
-        <h2>Browse by City</h2>
-        <div class="mps-cities-row">
-            <?php 
-            // V120: Fix undefined variable check
-            $cities_list = function_exists('antigravity_v200_cities_list') ? antigravity_v200_cities_list() : [];
-            foreach ($cities_list as $city): ?>
-                <a href="/<?= sanitize_title($city) ?>/" class="mps-city-pill"><?= esc_html($city) ?></a>
-            <?php endforeach; ?>
-        </div>
-    </section>
-    
-    <!-- LIST YOUR SERVICES SECTION (Refined CTA) -->
-    <section class="mps-list-services-section reveal">
-        <img src="/wp-content/uploads/2025/12/cat-dog-peeking.jpg" alt="Pets peeking around sign" class="mps-list-bg-img">
-        <div class="mps-list-overlay-content">
-            <h2>List Your Services</h2>
-            <p>Join our community. Create a profile in minutes and start receiving enquiries.</p>
-            <ul class="mps-benefits-ul">
-                <li>Get local bookings immediately</li>
-                <li>Keep your own rates & 0% commission</li>
-                <li>No exclusivity required</li>
-            </ul>
-            <a href="/join/" class="mps-btn-green">Create Free Listing</a>
-        </div>
-    </section>
-
-    <!-- JOIN PACK BOTTOM BANNER -->
-    <section class="mps-join-banner reveal">
-        <img src="/wp-content/uploads/2025/12/pets-peeking-wide.jpg" alt="Many pets looking at you" class="mps-join-banner-img">
-        <div class="mps-join-overlay">
-            <h2>Ready to find care?</h2>
-            <p>Connect with trusted local sitters today.</p>
-            <a href="#mps-hero-search-btn" class="mps-btn-green" onclick="document.querySelector('.mps-search-box').scrollIntoView({behavior: 'smooth'}); return false;">Find a Sitter</a>
-        </div>
-        </div>
-    </section>
-    
-    </div><!-- .mps-home-wrapper -->
-
-    <script>
+    </div><script>
     function mpsRegionChange() {
         var regionSelect = document.getElementById('mps-region-select');
         var suburbWrapper = document.getElementById('mps-suburb-wrapper');
@@ -1139,11 +993,11 @@ function antigravity_v200_render_homepage($atts) {
             return;
         }
 
-        // Show loading or reset
-        suburbSelect.innerHTML = '<option>Loading...</option>';
+        // Show Wrapper and Loading state
         suburbWrapper.style.display = 'block';
+        suburbSelect.innerHTML = '<option>Loading...</option>';
 
-        // AJAX Call
+        // Call AJAX
         var formData = new FormData();
         formData.append('action', 'antigravity_get_suburbs');
         formData.append('region', region);
@@ -1154,8 +1008,8 @@ function antigravity_v200_render_homepage($atts) {
         })
         .then(response => response.json())
         .then(data => {
-            suburbSelect.innerHTML = '<option value="">All ' + region + '</option>';
-            if(data.success && data.data.length > 0) {
+            suburbSelect.innerHTML = '<option value="">Select Suburb (Optional)</option>';
+            if(data.success && data.data && data.data.length > 0) {
                 data.data.forEach(function(sub) {
                     var opt = document.createElement('option');
                     opt.value = sub;
@@ -1163,10 +1017,15 @@ function antigravity_v200_render_homepage($atts) {
                     suburbSelect.appendChild(opt);
                 });
             } else {
-                // No suburbs found, maybe hide or show generic
+                var opt = document.createElement('option');
+                opt.text = "No specific suburbs found";
+                suburbSelect.appendChild(opt);
             }
         })
-        .catch(err => console.error(err));
+        .catch(err => {
+            console.error(err);
+            suburbSelect.innerHTML = '<option value="">Error loading</option>';
+        });
     }
 
     function mpsSearch(form) {
@@ -1174,19 +1033,15 @@ function antigravity_v200_render_homepage($atts) {
         var suburb = document.getElementById('mps-suburb-select').value;
         var service = document.getElementById('mps-service-select').value;
 
-        // Logic: ?s=Suburb OR ?s=Region
-        var locationQuery = suburb ? suburb : region;
-
-        if (!locationQuery) {
+        if (!region) {
             alert('Please select a region');
             return false;
         }
 
-        var searchUrl = '/?s=' + encodeURIComponent(locationQuery) + '&post_type=sitter';
+        // If suburb selected, search for suburb. Otherwise search for region.
+        var locationQuery = suburb ? suburb : region;
         
-        // If you have specific service filters, append them
-        // Note: WordPress default search doesn't handle custom tax queries in URL easily without extra code,
-        // but the text search will work.
+        var searchUrl = '/?s=' + encodeURIComponent(locationQuery) + '&post_type=sitter';
         
         window.location.href = searchUrl;
         return false;
