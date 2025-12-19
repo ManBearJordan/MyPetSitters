@@ -48,15 +48,15 @@ add_action('init', function() {
 
 
 // 2. CREATE BOOKING FUNCTION
-function mps_create_booking($owner_id, $sitter_id, $data) {
+function antigravity_v200_create_booking($owner_id, $sitter_id, $data) {
     if (!$owner_id || !$sitter_id) return new WP_Error('missing_user', 'User ID missing');
     
     $defaults = ['start_date' => '', 'end_date' => '', 'message' => '', 'pets' => ''];
     $data = wp_parse_args($data, $defaults);
     
     $title = sprintf("Booking: %s -> %s (%s)", 
-        mpb_get_name($owner_id), 
-        mpb_get_name($sitter_id),
+        antigravity_v200_get_name($owner_id), 
+        antigravity_v200_get_name($sitter_id),
         $data['start_date']
     );
     
@@ -78,13 +78,22 @@ function mps_create_booking($owner_id, $sitter_id, $data) {
     update_post_meta($post_id, 'mps_message', wp_kses_post($data['message']));
     
     // Notify Sitter
-    mps_notify_booking_update($post_id, 'created');
+    antigravity_v200_notify_booking_update($post_id, 'created');
     
     return $post_id;
 }
 
+// [mps_book_sitter] SHORTCODE
+add_shortcode('mps_book_sitter', 'antigravity_v200_render_booking_form_shortcode');
+function antigravity_v200_render_booking_form_shortcode($atts) {
+    // Placeholder for shortcode content, actual form rendering logic would go here.
+    // For now, it's just a placeholder as the instruction only provided the function signature.
+    return "Booking form shortcode placeholder.";
+}
+
 // 3. FORM HANDLER
-add_action('admin_post_mps_request_booking', function() {
+add_action('admin_post_mps_request_booking', 'antigravity_v200_handle_booking_submission');
+function antigravity_v200_handle_booking_submission() {
     if (!is_user_logged_in()) wp_safe_redirect(home_url('/login/'));
     
     if (!wp_verify_nonce($_POST['_wpnonce'], 'mps_book')) {
@@ -94,7 +103,7 @@ add_action('admin_post_mps_request_booking', function() {
     $sitter_id = absint($_POST['sitter_id']); // This is the USER ID of the sitter
     $owner_id = get_current_user_id();
     
-    $booking_id = mps_create_booking($owner_id, $sitter_id, [
+    $booking_id = antigravity_v200_create_booking($owner_id, $sitter_id, [
         'start_date' => sanitize_text_field($_POST['start_date']),
         'end_date' => sanitize_text_field($_POST['end_date']),
         'pets' => sanitize_text_field($_POST['pets']),
@@ -107,10 +116,11 @@ add_action('admin_post_mps_request_booking', function() {
         wp_redirect(home_url('/sitter/' . $sitter_id . '/?error=booking')); // Fallback redirect
     }
     exit;
-});
+}
 
 // 4. ACTION HANDLER (Accept/Decline)
-add_action('admin_post_mps_update_booking', function() {
+add_action('admin_post_mps_update_booking', 'antigravity_v200_handle_booking_update');
+function antigravity_v200_handle_booking_update() {
     if (!is_user_logged_in()) wp_die('Unauthorized');
     
     if (!wp_verify_nonce($_GET['_wpnonce'], 'mps_booking_action')) wp_die('Security fail');
@@ -131,15 +141,15 @@ add_action('admin_post_mps_update_booking', function() {
     ]);
     
     // Notify Owner
-    mps_notify_booking_update($booking_id, $action);
+    antigravity_v200_notify_booking_update($booking_id, $action);
     
     wp_redirect(home_url('/account/?booking_updated=1'));
     exit;
-});
+}
 
 
 // 5. HELPER: NOTIFICATIONS
-function mps_notify_booking_update($booking_id, $type) {
+function antigravity_v200_notify_booking_update($booking_id, $type) {
     $sitter_id = get_post_meta($booking_id, 'mps_sitter_id', true);
     $owner_id = get_post_meta($booking_id, 'mps_owner_id', true);
     
@@ -177,7 +187,9 @@ function mps_notify_booking_update($booking_id, $type) {
 }
 
 // Helper
-function mpb_get_name($user_id) {
+function antigravity_v200_get_name($user_id) {
     $u = get_userdata($user_id);
     return $u ? $u->display_name : 'User ' . $user_id;
 }
+
+

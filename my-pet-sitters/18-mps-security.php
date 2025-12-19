@@ -13,7 +13,8 @@ if (!defined('ABSPATH')) exit;
 // ---------------------------------------------------------
 // 1. CHANGE PASSWORD (Logged In)
 // ---------------------------------------------------------
-add_shortcode('mps_change_password', function() {
+add_shortcode('mps_change_password', 'antigravity_v200_change_password_shortcode');
+function antigravity_v200_change_password_shortcode() {
     if (!is_user_logged_in()) return '';
     
     $msg = '';
@@ -47,9 +48,10 @@ add_shortcode('mps_change_password', function() {
     </div>
     <?php
     return ob_get_clean();
-});
+}
 
-add_action('admin_post_mps_process_change_password', function() {
+add_action('admin_post_mps_process_change_password', 'antigravity_v200_handle_change_password');
+function antigravity_v200_handle_change_password() {
     if (!is_user_logged_in()) wp_die('Unauthorized');
     check_admin_referer('mps_change_pass');
     
@@ -74,13 +76,14 @@ add_action('admin_post_mps_process_change_password', function() {
     
     wp_redirect(home_url('/account/?tab=profile&pass_updated=1'));
     exit;
-});
+}
 
 
 // ---------------------------------------------------------
 // 2. LOST PASSWORD (Public)
 // ---------------------------------------------------------
-add_shortcode('mps_lost_password', function() {
+add_shortcode('mps_lost_password', 'antigravity_v200_lost_password_shortcode');
+function antigravity_v200_lost_password_shortcode() {
     if (is_user_logged_in()) return '<p>You are already logged in.</p>';
     
     $msg = '';
@@ -109,9 +112,10 @@ add_shortcode('mps_lost_password', function() {
     </div>
     <?php
     return ob_get_clean();
-});
+}
 
-add_action('admin_post_mps_process_lost_password', function() {
+add_action('admin_post_mps_process_lost_password', 'antigravity_v200_handle_lost_password');
+function antigravity_v200_handle_lost_password() {
     check_admin_referer('mps_lost_pass');
     
     $login = sanitize_text_field($_POST['user_login']);
@@ -141,13 +145,14 @@ add_action('admin_post_mps_process_lost_password', function() {
     
     wp_redirect(home_url('/lost-password/?reset_sent=1'));
     exit;
-});
+}
 
 
 // ---------------------------------------------------------
 // 3. RESET PASSWORD FORM (Public)
 // ---------------------------------------------------------
-add_shortcode('mps_reset_password', function() {
+add_shortcode('mps_reset_password', 'antigravity_v200_reset_password_shortcode');
+function antigravity_v200_reset_password_shortcode() {
     if (!isset($_GET['key']) || !isset($_GET['login'])) {
         return '<p>Invalid password reset link.</p>';
     }
@@ -184,9 +189,10 @@ add_shortcode('mps_reset_password', function() {
     </div>
     <?php
     return ob_get_clean();
-});
+}
 
-add_action('admin_post_mps_process_reset_password', function() {
+add_action('admin_post_mps_process_reset_password', 'antigravity_v200_handle_reset_password');
+function antigravity_v200_handle_reset_password() {
     check_admin_referer('mps_do_reset');
     
     $login = $_POST['user_login'];
@@ -203,4 +209,6 @@ add_action('admin_post_mps_process_reset_password', function() {
     
     wp_redirect(home_url('/login/?password_reset=1'));
     exit;
-});
+}
+
+

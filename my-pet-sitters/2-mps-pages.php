@@ -15,10 +15,97 @@
 if (!defined('ABSPATH')) exit;
 
 // ===========================================================================
-// SECTION 1: [MPS_PAGE] SHORTCODE
+// SECTION 0: REWRITE RULES & QUERY VARS (V75)
 // ===========================================================================
 
-add_shortcode('mps_page', function($atts) {
+add_action('init', function() {
+    // 1. Regional Service Pages: /regions/{state}/{region}/{service}/
+    // e.g. /regions/nsw/new-england/dog-walking/
+    add_rewrite_rule(
+        '^regions/([^/]+)/([^/]+)/([^/]+)/?$',
+        'index.php?mps_state=$matches[1]&mps_region_slug=$matches[2]&mps_service_slug=$matches[3]',
+        'top'
+    );
+    
+    // 2. Rural Hub Pages: /regions/{state}/rural-pet-sitters/
+    // e.g. /regions/nsw/rural-pet-sitters/
+    add_rewrite_rule(
+        '^regions/([^/]+)/rural-pet-sitters/?$',
+        'index.php?mps_state=$matches[1]&mps_rural_hub=1',
+        'top'
+    );
+});
+
+add_filter('query_vars', function($vars) {
+    $vars[] = 'mps_state';
+    $vars[] = 'mps_region_slug';
+    $vars[] = 'mps_service_slug';
+    $vars[] = 'mps_rural_hub';
+    return $vars;
+});
+
+add_action('template_redirect', function() {
+    global $wp_query;
+    
+    // Handle Regional Service Pages
+    if (get_query_var('mps_state') && get_query_var('mps_region_slug') && get_query_var('mps_service_slug')) {
+        $state   = get_query_var('mps_state');
+        $region  = get_query_var('mps_region_slug');
+        $service = get_query_var('mps_service_slug');
+        
+        include(plugin_dir_path(__FILE__) . 'tmpl-regional.php');
+        exit;
+    }
+    
+    // Handle Rural Hub Pages
+    if (get_query_var('mps_state') && get_query_var('mps_rural_hub')) {
+        // PREVENT "HELLO WORLD":
+        // The custom URL defaults to "Latest Posts" (is_home=true). We must override this.
+        $wp_query->is_home = false;
+        $wp_query->is_archive = false;
+        $wp_query->is_page = true;
+        $wp_query->is_singular = true;
+        $wp_query->is_404 = false;
+        
+        // Create dummy post to satisfy theme loops
+        $dummy = new stdClass();
+        $dummy->ID = -999;
+        $dummy->post_author = 1;
+        $dummy->post_date = current_time('mysql');
+        $dummy->post_date_gmt = current_time('mysql', 1);
+        $dummy->post_title = 'Rural Sitters';
+        $dummy->post_content = ''; // Empty content so theme outputs nothing extra
+        $dummy->post_status = 'publish';
+        $dummy->comment_status = 'closed';
+        $dummy->ping_status = 'closed';
+        $dummy->post_name = 'rural-hub';
+        $dummy->post_type = 'page';
+        $dummy->filter = 'raw';
+        
+        $post = new WP_Post($dummy);
+        $wp_query->post = $post;
+        $wp_query->posts = [$post];
+        $wp_query->post_count = 1;
+        $wp_query->found_posts = 1;
+        $wp_query->max_num_pages = 1;
+        
+        global $post; // reinforce global
+        
+        include(plugin_dir_path(__FILE__) . 'tmpl-rural.php');
+        exit;
+    }
+    
+    // Handle Sitter Search (V84)
+    // Handle Sitter Search (V84)
+    $pt = get_query_var('post_type');
+    if (is_search() && ( $pt === 'sitter' || (is_array($pt) && in_array('sitter', $pt)) )) {
+        include(plugin_dir_path(__FILE__) . 'tmpl-search.php');
+        exit;
+    }
+});
+
+add_shortcode('mps_page', 'antigravity_v200_render_page');
+function antigravity_v200_render_page($atts) {
     $a = shortcode_atts(['city' => '', 'service' => ''], $atts, 'mps_page');
     $city    = trim($a['city']);
     $service = trim($a['service']);
@@ -27,8 +114,8 @@ add_shortcode('mps_page', function($atts) {
         return '<p>Shortcode needs at least a city or a service.</p>';
     }
     
-    $cities = mps_cities_list();
-    $services = mps_services_map();
+    $cities = antigravity_v200_cities_list();
+    $services = antigravity_v200_services_map();
     $blurbs = [
         'Dog Walking'     => 'Local dog walkers offering reliable 30-60 min walks with photo updates.',
         'Overnight Stays' => 'In-home boarding or a sitter at your place - message before booking.',
@@ -62,7 +149,7 @@ add_shortcode('mps_page', function($atts) {
         </div>
         
         <?php
-        echo mps_render_sitter_grid($city, $service);
+        echo antigravity_v200_render_sitter_grid($city, $service);
         ?>
         
         <h2>About <?= $esc($service) ?> in <?= $esc($city) ?></h2>
@@ -82,7 +169,7 @@ add_shortcode('mps_page', function($atts) {
             <?php endforeach; ?>
         </p>
         
-        <?= mps_render_faqs($city, $service); ?>
+        <?= antigravity_v200_render_faqs($city, $service); ?>
         
     <?php
     // CITY ONLY PAGE
@@ -100,7 +187,7 @@ add_shortcode('mps_page', function($atts) {
             <?php endforeach; ?>
         </div>
         
-        <?php echo mps_render_sitter_grid($city, ''); ?>
+        <?php echo antigravity_v200_render_sitter_grid($city, ''); ?>
         
         <h3>Explore other cities</h3>
         <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:16px 0 32px;">
@@ -109,7 +196,7 @@ add_shortcode('mps_page', function($atts) {
             <?php endforeach; ?>
         </div>
         
-        <?= mps_render_faqs($city, ''); ?>
+        <?= antigravity_v200_render_faqs($city, ''); ?>
         
     <?php
     // SERVICE ONLY PAGE
@@ -134,22 +221,23 @@ add_shortcode('mps_page', function($atts) {
             <?php endforeach; ?>
         </div>
         
-        <?= mps_render_faqs('', $service); ?>
+        <?= antigravity_v200_render_faqs('', $service); ?>
         
     <?php } ?>
     
     </section>
     <?php
     return ob_get_clean();
-});
+}
 
 // ===========================================================================
 // SECTION 1B: [MPS_CITIES] SHORTCODE - Cities Index Page
 // ===========================================================================
 
-add_shortcode('mps_cities', function($atts) {
-    $cities = mps_cities_list();
-    $services = mps_services_map();
+// Converted to named function (V120 Fix)
+function antigravity_v200_render_cities($atts) {
+    $cities = antigravity_v200_cities_list();
+    $services = antigravity_v200_services_map();
     
     ob_start();
     ?>
@@ -201,15 +289,19 @@ add_shortcode('mps_cities', function($atts) {
     </section>
     <?php
     return ob_get_clean();
-});
+}
+// Register Shortcode (V120 Fix)
+add_shortcode('mps_cities', 'antigravity_v200_render_cities');
 
 // ===========================================================================
 // SECTION 1C: [MPS_SERVICES] SHORTCODE - Services Index Page
 // ===========================================================================
 
-add_shortcode('mps_services', function($atts) {
-    $cities = mps_cities_list();
-    $services = mps_services_map();
+// Converted to named function (V120 Fix)
+// Converted to named function (V120 Fix)
+function antigravity_v200_render_services($atts) {
+    $cities = antigravity_v200_cities_list();
+    $services = antigravity_v200_services_map();
     $blurbs = [
         'Dog Walking'     => 'Local dog walkers offering reliable 30-60 min walks with photo updates.',
         'Overnight Stays' => 'In-home boarding or a sitter at your place - message before booking.',
@@ -267,13 +359,16 @@ add_shortcode('mps_services', function($atts) {
     </section>
     <?php
     return ob_get_clean();
-});
+}
+// Register BOTH names (V120 Fix) - Fixes "Sitter List" pages
+// Register Shortcode (V121 Fix)
+add_shortcode('mps_services', 'antigravity_v200_render_services');
 
 // ===========================================================================
 // SECTION 2: SITTER GRID RENDERER
 // ===========================================================================
 
-function mps_render_sitter_grid($city, $service = '', $limit = 12) {
+function antigravity_v200_render_sitter_grid($city, $service = '', $limit = 12) {
     if (!post_type_exists('sitter')) {
         return '<div style="background:var(--mps-primary-light, #e8f0ea);padding:24px;border-radius:12px;text-align:center;margin:24px 0;">
             <p style="margin:0 0 8px;font-size:1.1em;"><strong>Coming Soon!</strong></p>
@@ -328,43 +423,127 @@ function mps_render_sitter_grid($city, $service = '', $limit = 12) {
     $heading = $service 
         ? esc_html($service) . ' Sitters' . ($city ? ' in ' . esc_html($city) : '')
         : 'Local Sitters' . ($city ? ' in ' . esc_html($city) : '');
+    // CSS for Modern Cards on these pages 
+    echo '<style>
+    .mps-sitter-grid-modern { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
+    .mps-sitter-card-modern { background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); transition: transform 0.3s, box-shadow 0.3s; border:1px solid #eee; }
+    .mps-sitter-card-modern:hover { transform: translateY(-6px); box-shadow: 0 12px 40px rgba(0,0,0,0.12); border-color:var(--mps-teal, #0d7377); }
+    .mps-sitter-photo { width: 100%; height: 200px; object-fit: cover; background: linear-gradient(135deg, #e0f4f4, #f5f3f0); }
+    .mps-sitter-info { padding: 20px; }
+    .mps-sitter-name { font-size: 1.25rem; font-weight: 600; color: #1a2b3c; margin: 0 0 4px; }
+    .mps-sitter-location { color: #5a6b7c; font-size: 14px; margin: 0 0 12px; display: flex; align-items: center; gap: 4px; }
+    .mps-sitter-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .mps-badge { background: #e0f4f4; color: #0d7377; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .mps-badge.coral { background: #ffe5e5; color: #ff6b6b; }
+    .mps-sitter-price { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee; }
+    .mps-sitter-price .price { font-size: 1.1rem; font-weight: 600; color: #0d7377; }
+    .mps-sitter-price .label { font-size: 12px; color: #5a6b7c; }
+    .mps-view-btn { background: #0d7377 !important; color: #fff !important; padding: 10px 20px !important; border-radius: 25px !important; font-size: 14px !important; font-weight: 500 !important; text-decoration: none !important; transition: background 0.2s !important; }
+    .mps-view-btn:hover { background: #095456 !important; }
+    </style>';
+
     echo '<div class="mps-results" id="mps-sitter-grid"><h2>' . $heading . '</h2>';
-    echo '<div class="mps-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;">';
+    echo '<div class="mps-sitter-grid-modern">';
     
     while ($q->have_posts()) {
         $q->the_post();
-        $meta = mps_get_sitter_meta(get_the_ID());
-        $thumb = mps_get_sitter_thumbnail(get_the_ID());
+        $ID = get_the_ID();
         
-        $meta_parts = array_filter([
-            $meta['suburb'],
-            $city ?: $meta['city'],
-            $meta['price'] ? 'From ' . $meta['price'] : '',
-        ]);
+        $city_meta = get_post_meta($ID, 'mps_city', true);
+        $suburb_meta = get_post_meta($ID, 'mps_suburb', true);
+        $services_list = get_post_meta($ID, 'mps_services', true);
+        $services_arr = array_map('trim', explode(',', $services_list));
+        $thumb = antigravity_v200_get_sitter_thumbnail($ID);
+        
+        // Logic to find the LOWEST price across all services
+        $price = 0;
+        $min_price = 99999;
+        
+        // Scan all potential services for this sitter
+        $all_services = antigravity_v200_services_map(); 
+        
+        // V77 Price Fix: Iterate all services and check for ANY valid price
+        // We do not rely solely on 'mps_services' array because it might be out of sync or have whitespace.
+        // If a price exists > 0, we count it.
+        
+        foreach ($all_services as $svc_label => $svc_slug) {
+            $p_key = 'mps_price_' . $svc_slug;
+            $p_val = get_post_meta($ID, $p_key, true);
+            
+            if ($p_val && is_numeric($p_val) && $p_val > 0) {
+                 if ($p_val < $min_price) {
+                     $min_price = $p_val;
+                 }
+            }
+        }
+        
+        if ($min_price < 99999) {
+            $price = $min_price;
+        } else {
+            $price = ''; // No valid prices found
+        }
+        $name = get_the_title();
+
         ?>
-        <article class="mps-card" style="border:1px solid #eaeaea;border-radius:12px;overflow:hidden;background:#fff;">
-            <a class="mps-card-img" href="<?= esc_url(get_permalink()) ?>">
-                <?php if ($thumb): ?>
-                    <img src="<?= esc_url($thumb) ?>" alt="<?= esc_attr(get_the_title()) ?>" style="display:block;width:100%;height:auto">
-                <?php else: ?>
-                    <div style="background:#f0f0f0;height:140px;display:flex;align-items:center;justify-content:center;color:#999;">No photo</div>
-                <?php endif; ?>
-            </a>
-            <div class="mps-card-body" style="padding:12px;">
-                <h4 style="margin:0 0 6px;"><a href="<?= esc_url(get_permalink()) ?>"><?= esc_html(get_the_title()) ?></a></h4>
-                <p style="margin:0 0 6px;font-size:0.9em;opacity:.8;">
-                    <?= esc_html(implode(' &bull; ', $meta_parts)) ?>
+        <div class="mps-sitter-card-modern">
+            <?php if ($thumb): ?>
+                <img src="<?= esc_url($thumb) ?>" alt="<?= esc_attr($name) ?>" class="mps-sitter-photo">
+            <?php else: ?>
+                <div class="mps-sitter-photo" style="display:flex;align-items:center;justify-content:center;color:#999;">No photo</div>
+            <?php endif; ?>
+            
+            <div class="mps-sitter-info">
+                <h3 class="mps-sitter-name"><a href="<?= get_permalink() ?>" style="text-decoration:none;color:inherit;"><?= esc_html($name) ?></a></h3>
+                <?php
+                // V104: PREFER REGION DISPLAY
+                $region_term = wp_get_post_terms($ID, 'mps_region', ['fields' => 'names']);
+                $region_name = !empty($region_term) ? $region_term[0] : '';
+                
+                $location_display = $city_meta;
+                if ($suburb_meta) {
+                    // If Region exists, show Suburb, Region (e.g. Tamworth, New England)
+                    if ($region_name) {
+                        $location_display = "$suburb_meta, $region_name";
+                    } else {
+                        $location_display = "$suburb_meta, $city_meta";
+                    }
+                } elseif ($region_name) {
+                    $location_display = $region_name;
+                }
+                ?>
+                <p class="mps-sitter-location">
+                    📍 <?= esc_html($location_display) ?>
                 </p>
-                <?php if (!empty($meta['services'])): ?>
-                    <p style="margin:0;font-size:0.85em;">
-                        <?php foreach (array_slice($meta['services'], 0, 3) as $svc): ?>
-                            <span style="background:#e8f0ea;padding:2px 6px;border-radius:4px;margin-right:4px;"><?= esc_html($svc) ?></span>
-                        <?php endforeach; ?>
-                    </p>
-                <?php endif; ?>
-                <a href="<?= esc_url(get_permalink()) ?>" class="mps-btn" style="display:block;text-align:center;margin-top:12px;padding:8px;font-size:.9em;">View Profile</a>
+                
+                <div class="mps-sitter-badges">
+                    <?php 
+                    $count = 0;
+                    foreach ($services_arr as $svc): 
+                        if ($count >= 2) break;
+                        $svc = trim($svc);
+                        if (!$svc) continue;
+                    ?>
+                        <span class="mps-badge"><?= esc_html($svc) ?></span>
+                    <?php 
+                        $count++;
+                    endforeach; 
+                    if (count($services_arr) > 2): ?>
+                        <span class="mps-badge coral">+<?= count($services_arr) - 2 ?> more</span>
+                    <?php endif; ?>
+                </div>
+                
+                <div class="mps-sitter-price">
+                    <div>
+                        <?php if ($price): ?>
+                            <span class="price">From $<?= esc_html($price) ?></span>
+                        <?php else: ?>
+                            <span class="label">Contact for pricing</span>
+                        <?php endif; ?>
+                    </div>
+                    <a href="<?= get_permalink($ID) ?>" class="mps-view-btn">View</a>
+                </div>
             </div>
-        </article>
+        </div>
         <?php
     }
     wp_reset_postdata();
@@ -373,40 +552,49 @@ function mps_render_sitter_grid($city, $service = '', $limit = 12) {
     return ob_get_clean();
 }
 
-function mps_get_sitter_thumbnail($post_id) {
-    if (has_post_thumbnail($post_id)) {
-        return get_the_post_thumbnail_url($post_id, 'medium');
-    }
-    return '';
-}
+
 
 // ===========================================================================
 // SECTION 3: FAQ RENDERER
 // ===========================================================================
 
-function mps_render_faqs($city = '', $service = '') {
-    $faqs = [];
-    
-        if ($service && $city) {
-        $faqs = [
+function antigravity_v200_render_faqs($city = '', $service = '', $mode = 'preview') {
+    $all_faqs = [
+        'general' => [
+            ['q' => "How do I ensure a sitter is trustworthy?", 'a' => 'We encourage all owners to read reviews, check verified badges, and always organize a configured Meet & Greet before booking.'],
+            ['q' => "What happens if I need to cancel?", 'a' => 'Each sitter sets their own cancellation policy. Check their profile for details before booking.'],
+            ['q' => "Is there insurance included?", 'a' => 'We are working on comprehensive insurance. Currently, check with your specific sitter regarding their own coverage.'],
+            ['q' => "How do I pay?", 'a' => 'My Pet Sitters is a directory service. All payments are arranged directly between you and the sitter.'],
+            ['q' => "Can I meet the sitter first?", 'a' => 'Yes! We highly recommend a Meet & Greet to ensure your pet is comfortable with the sitter.'],
+        ],
+        'city_specific' => [],
+        'service_specific' => []
+    ];
+
+    if ($service && $city) {
+        $all_faqs['specific'] = [
             ['q' => "How much does {$service} cost in {$city}?", 'a' => 'Rates vary by sitter. Compare profiles to find one that fits your budget.'],
-            ['q' => "How do I choose the right sitter?", 'a' => 'Read reviews from other pet owners, check their profile details, and always organize a meet-and-greet first.'],
             ['q' => "What areas of {$city} do sitters cover?", 'a' => 'Most sitters list their suburb and travel range in their profile.'],
-            ['q' => "What's included in {$service}?", 'a' => 'Each sitter sets their own services. Message them to confirm details.'],
             ['q' => "How do I book {$service} in {$city}?", 'a' => 'Pick your service, enter your suburb, compare trusted local profiles, then book.'],
         ];
     } elseif ($city) {
-        $faqs = [
+        $all_faqs['specific'] = [
             ['q' => "How do I find a pet sitter in {$city}?", 'a' => 'Browse sitters by service type above, then compare profiles and reviews.'],
-            ['q' => "How do I know a sitter is trustworthy?", 'a' => 'We encourage you to read reviews from other local pet owners and meet the sitter in person before booking.'],
             ['q' => "What services are available in {$city}?", 'a' => 'Dog walking, overnight stays, daycare, and home visits.'],
         ];
     } elseif ($service) {
-        $faqs = [
+        $all_faqs['specific'] = [
             ['q' => "What is {$service}?", 'a' => 'Professional pet care service provided by trusted local sitters.'],
             ['q' => "How much does {$service} cost?", 'a' => 'Rates vary by city and sitter. Compare profiles for pricing.'],
             ['q' => "Is {$service} available in my area?", 'a' => 'We cover major Australian cities. Check your city page.'],
         ];
+    }
+    
+    // Merge FAQs: Specific first, then General
+    $faqs = array_merge($all_faqs['specific'] ?? [], $all_faqs['general']);
+    
+    if ($mode === 'preview') {
+        $faqs = array_slice($faqs, 0, 3); // Show only top 3
     }
     
     if (!$faqs) return '';
@@ -414,13 +602,19 @@ function mps_render_faqs($city = '', $service = '') {
     ob_start();
     ?>
     <div class="mps-faqs" style="margin:32px 0;">
-        <h2>FAQs</h2>
+        <h2><?= ($mode === 'full') ? 'Frequently Asked Questions' : 'FAQs' ?></h2>
         <?php foreach ($faqs as $faq): ?>
-            <details style="border:1px solid #eaeaea;border-radius:8px;margin-bottom:8px;padding:12px 16px;">
-                <summary style="cursor:pointer;font-weight:600;"><?= esc_html($faq['q']) ?></summary>
-                <p style="margin:8px 0 0;opacity:.9;"><?= esc_html($faq['a']) ?></p>
+            <details style="border:1px solid #eaeaea;border-radius:12px;margin-bottom:12px;padding:16px 20px;background:#fff;transition:all 0.2s;">
+                <summary style="cursor:pointer;font-weight:600;color:var(--mps-teal, #0d7377);outline:none;"><?= esc_html($faq['q']) ?></summary>
+                <p style="margin:12px 0 0;color:#555;line-height:1.6;"><?= esc_html($faq['a']) ?></p>
             </details>
         <?php endforeach; ?>
+        
+        <?php if ($mode === 'preview'): ?>
+            <div style="text-align:center;margin-top:20px;">
+                <a href="/faqs/" style="color:var(--mps-teal, #0d7377);font-weight:600;text-decoration:none;">View all FAQs &rarr;</a>
+            </div>
+        <?php endif; ?>
     </div>
     
     <script type="application/ld+json">
@@ -444,6 +638,15 @@ function mps_render_faqs($city = '', $service = '') {
     <?php
     return ob_get_clean();
 }
+
+/**
+ * [mps_faq_full] Shortcode
+ */
+add_shortcode('mps_faq_full', function($atts) {
+    return '<section class="mps-wrap" style="max-width:800px;margin:0 auto;padding:40px 20px;">' . 
+           antigravity_v200_render_faqs('', '', 'full') . 
+           '</section>';
+});
 
 // ===========================================================================
 // SECTION 4: [MPS_ABOUT] SHORTCODE
@@ -546,9 +749,9 @@ add_shortcode('mps_about', function($atts) {
         <div style="text-align:center;margin-top:60px;background:var(--mps-cream, #faf8f5);padding:60px;border-radius:20px;">
             <h2 style="margin-bottom:16px;">Ready to join the pack?</h2>
             <p style="margin-bottom:32px;font-size:1.1rem;color:#666;">Create your profile today and start connecting.</p>
-            <div style="display:flex;gap:16px;justify-content:center;">
-                <a href="#mps-sitter-grid" class="wp-block-button__link" style="background:var(--mps-teal, #0d7377) !important;border-radius:50px;padding:14px 32px;">Find a Sitter</a>
-                <a href="/list-your-services/" class="wp-block-button__link" style="background:#fff !important;color:var(--mps-teal, #0d7377) !important;border:1px solid var(--mps-teal, #0d7377);border-radius:50px;padding:14px 32px;">List Your Services</a>
+            <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;">
+                <a href="/index.php#mps-sitter-grid" class="wp-block-button__link" style="background:var(--mps-teal, #0d7377) !important;border-radius:50px;padding:14px 32px;text-align:center;min-width:200px;">Find a Sitter</a>
+                <a href="/list-your-services/" class="wp-block-button__link" style="background:#fff !important;color:var(--mps-teal, #0d7377) !important;border:1px solid var(--mps-teal, #0d7377);border-radius:50px;padding:14px 32px;text-align:center;min-width:200px;">List Your Services</a>
             </div>
         </div>
     </section>
@@ -614,3 +817,71 @@ add_action('template_redirect', function() {
         }
     }
 });
+
+// ===========================================================================
+// SECTION 7: REGIONS INDEX SHORTCODE [mps_regions]
+// ===========================================================================
+
+add_shortcode('mps_regions', function($atts) {
+    // Group Locations by State
+    $locations = antigravity_v200_get_valid_locations();
+    $states_map = antigravity_v200_states_list();
+    $groups = [];
+    
+    foreach ($states_map as $code => $name) {
+        $groups[$code] = [
+            'name' => $name,
+            'regions' => []
+        ];
+    }
+    
+    ob_start();
+    ?>
+    <section class="mps-wrap" style="max-width:1100px;margin:0 auto;padding:40px 20px;">
+        <p class="eyebrow" style="text-transform:uppercase;font-weight:600;margin:0 0 8px;color:var(--mps-teal, #0d7377);">Australia Wide</p>
+        <h1 style="margin-bottom:32px;">Browse Pet Sitters by Region</h1>
+        
+        <div class="mps-state-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));gap:32px;">
+            <?php foreach ($groups as $code => $data): ?>
+            <div class="mps-state-card" style="background:#fff;border:1px solid #eee;border-radius:12px;padding:24px;">
+                <h2 style="font-size:1.5rem;margin:0 0 16px;border-bottom:2px solid #e8f0ea;padding-bottom:12px;"><?= esc_html($data['name']) ?></h2>
+                
+                <h4 style="margin:0 0 12px;color:#666;font-size:0.95rem;text-transform:uppercase;letter-spacing:1px;">Rural & Farm</h4>
+                <ul style="list-style:none;margin:0 0 24px;padding:0;">
+                    <li>
+                        <a href="/regions/<?= strtolower($code) ?>/rural-pet-sitters/" style="display:flex;align-items:center;background:#f8faf9;padding:12px;border-radius:8px;text-decoration:none;color:#2e7d32;font-weight:600;border:1px solid #e5ebe7;">
+                            <span style="margin-right:8px;">🚜</span> Rural <?= esc_html($code) ?> Hub
+                        </a>
+                    </li>
+                </ul>
+                
+                <?php
+                // V85: Dynamic State Examples
+                $examples = [
+                    'NSW' => 'Dubbo, Tamworth, or Orange',
+                    'VIC' => 'Geelong, Ballarat, or Bendigo',
+                    'QLD' => 'Toowoomba, Mackay, or Cairns',
+                    'WA'  => 'Bunbury, Albany, or Kalgoorlie',
+                    'SA'  => 'Mount Gambier, Whyalla, or Gawler',
+                    'TAS' => 'Launceston, Devonport, or Burnie',
+                    'ACT' => 'Canberra, Belconnen, or Tuggeranong',
+                    'NT'  => 'Alice Springs, Katherine, or Palmerston'
+                ];
+                $city_text = $examples[$code] ?? 'your local town';
+                ?>
+                <div style="font-size:0.9rem;color:#666;">
+                    <p><em>Check the main search bar to find sitters in specific towns like <?= esc_html($city_text) ?>.</em></p>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+
+        <div style="margin-top:60px;text-align:center;background:#eef6f6;padding:40px;border-radius:20px;">
+            <h3>Don't see your location?</h3>
+            <p>We are expanding rapidly across Australia. <a href="/list-your-services/">List your services</a> to create a new regional hub.</p>
+        </div>
+    </section>
+    <?php
+    return ob_get_clean();
+});
+

@@ -18,21 +18,21 @@ add_filter('wp_mail', function($args) {
     if (strpos($args['message'], '<!DOCTYPE html>') === false && strpos($args['message'], '<html') === false) {
         $subject = $args['subject'];
         $body = $args['message'];
-        
+
         // Use subject as heading usually, or generic
         $heading = $subject;
-        
-        $args['message'] = mps_get_email_template($body, $heading);
+
+        $args['message'] = antigravity_v200_get_email_template($body, $heading);
     }
     return $args;
 });
 
-function mps_get_email_template($content, $heading = 'My Pet Sitters') {
+function antigravity_v200_get_email_template($content, $heading = 'My Pet Sitters') {
     // Basic formatting for newlines if plain text was passed
     if (strpos($content, '<p>') === false) {
         $content = wpautop($content);
     }
-    
+
     // TEMPLATE
     ob_start();
     ?>
@@ -89,3 +89,5 @@ function mps_get_email_template($content, $heading = 'My Pet Sitters') {
     <?php
     return ob_get_clean();
 }
+
+

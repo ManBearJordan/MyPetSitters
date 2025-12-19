@@ -20,8 +20,28 @@ add_action('init', function() {
     ]);
 });
 
+// HELPER: Send Email Notification
+function antigravity_v200_notify_message($msg_id, $sender_id, $recipient_id, $content) {
+    $recipient = get_userdata($recipient_id);
+    $sender = get_userdata($sender_id);
+    
+    if ($recipient && $sender) {
+        $to = $recipient->user_email;
+        $subject = 'New message from ' . $sender->display_name . ' on My Pet Sitters';
+        $link = home_url('/messages/?convo=' . $sender_id); // Link directly to conversation
+        
+        $message = "Hi " . $recipient->display_name . ",\n\n";
+        $message .= "You have received a new message from " . $sender->display_name . ":\n\n";
+        $message .= "\"" . wp_trim_words(strip_tags($content), 20) . "...\"\n\n";
+        $message .= "Click here to view and reply:\n" . $link . "\n\n";
+        $message .= "Thanks,\nMy Pet Sitters Team";
+        
+        wp_mail($to, $subject, $message);
+    }
+}
+
 // 2. SEND MESSAGE FUNCTION
-function mps_send_message($sender_id, $recipient_id, $content, $subject = '') {
+function antigravity_v200_send_message($sender_id, $recipient_id, $content, $subject = '') {
     if (!$sender_id || !$recipient_id || empty($content)) return new WP_Error('missing_data', 'Missing required fields');
     
     // Conversation ID (always smaller_larger)
@@ -46,29 +66,14 @@ function mps_send_message($sender_id, $recipient_id, $content, $subject = '') {
     update_post_meta($msg_id, 'mps_conversation_id', $conv_id);
     
     // Send Email Notification
-    $recipient = get_userdata($recipient_id);
-    $sender = get_userdata($sender_id);
-    
-    if ($recipient && $sender) {
-        $to = $recipient->user_email;
-        $subject = 'New message from ' . $sender->display_name . ' on My Pet Sitters';
-        $link = home_url('/messages/?convo=' . $sender_id); // Link directly to conversation
-        
-        $message = "Hi " . $recipient->display_name . ",\n\n";
-        $message .= "You have received a new message from " . $sender->display_name . ":\n\n";
-        $message .= "\"" . wp_trim_words(strip_tags($content), 20) . "...\"\n\n";
-        $message .= "Click here to view and reply:\n" . $link . "\n\n";
-        $message .= "Thanks,\nMy Pet Sitters Team";
-        
-        wp_mail($to, $subject, $message);
-    }
+    antigravity_v200_notify_message($msg_id, $sender_id, $recipient_id, $content);
     
     return $msg_id;
 }
 
 // 3. FORM HANDLER
-add_action('admin_post_mps_send_msg', 'mps_handle_msg_send');
-function mps_handle_msg_send() {
+add_action('admin_post_mps_send_msg', 'antigravity_v200_handle_msg_send');
+function antigravity_v200_handle_msg_send() {
     if (!is_user_logged_in()) wp_safe_redirect(home_url('/login/'));
     
     if (!wp_verify_nonce($_POST['_wpnonce'], 'mps_send_msg')) {
@@ -80,7 +85,7 @@ function mps_handle_msg_send() {
     $content = trim($_POST['message_content']);
     
     if ($recipient_id && $content) {
-        mps_send_message($sender_id, $recipient_id, $content);
+        antigravity_v200_send_message($sender_id, $recipient_id, $content);
         // Redirect back to conversation
         wp_redirect(home_url('/messages/?convo=' . $recipient_id));
         exit;
@@ -92,7 +97,8 @@ function mps_handle_msg_send() {
 }
 
 // 4. SHORTCODE: [mps_inbox]
-add_shortcode('mps_inbox', function($atts) {
+add_shortcode('mps_inbox', 'antigravity_v200_inbox_shortcode');
+function antigravity_v200_inbox_shortcode($atts) {
     if (!is_user_logged_in()) return '<p>Please <a href="/login/">log in</a> to view messages.</p>';
     
     $current_user_id = get_current_user_id();
@@ -163,7 +169,7 @@ add_shortcode('mps_inbox', function($atts) {
                     $target_is_sitter = in_array('sitter', (array)$other_user->roles) || in_array('pro', (array)$other_user->roles);
                     
                     if ($target_is_sitter) {
-                        $sitter_post = mps_get_user_sitter_post($active_convo_user);
+                        $sitter_post = antigravity_v200_get_sitter_post($active_convo_user);
                         if ($sitter_post) $profile_url = get_permalink($sitter_post->ID);
                     } else {
                         // Is Owner -> Link to our new owner profile view
@@ -251,10 +257,11 @@ add_shortcode('mps_inbox', function($atts) {
     </style>
     <?php
     return ob_get_clean();
-});
+}
 
-// 5. HELPER: CONTACT BUTTON
-add_shortcode('mps_contact_button', function($atts) {
+// 5. SHORTCODE: [mps_contact_button]
+add_shortcode('mps_contact_button', 'antigravity_v200_contact_button_shortcode');
+function antigravity_v200_contact_button_shortcode($atts) {
     if (!is_user_logged_in()) {
         return '<a href="/login/" class="wp-block-button__link">Log in to Contact</a>';
     }
@@ -264,25 +271,42 @@ add_shortcode('mps_contact_button', function($atts) {
     
     // Get sender/recipient
     $current_user_id = get_current_user_id();
-    $sitter_id = mps_get_sitter_user_id($atts['sitter_id']); // Helper needed to get user ID from post ID
+    $sitter_id = antigravity_v200_get_sitter_user_id($atts['sitter_id']); // Helper needed to get user ID from post ID
     
     if (!$sitter_id || $sitter_id == $current_user_id) return ''; // Can't msg self
     
     // Link directly to new conversation
     return '<a href="/messages/?convo=' . $sitter_id . '" class="wp-block-button__link" style="border-radius:50px!important;">Message Sitter</a>';
-});
+}
 
 // Helper to get User ID from Sitter Post ID
-function mps_get_sitter_user_id($post_id) {
+function antigravity_v200_get_sitter_user_id($post_id) {
     $post = get_post($post_id);
     return $post ? $post->post_author : 0;
 }
 
+// HELPER: Get Unread Count
+function antigravity_v200_get_unread_count($user_id) {
+    global $wpdb;
+    $count = $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(p.ID) FROM {$wpdb->posts} p
+         JOIN {$wpdb->postmeta} pm_recipient ON p.ID = pm_recipient.post_id AND pm_recipient.meta_key = 'mps_recipient_id'
+         JOIN {$wpdb->postmeta} pm_read_status ON p.ID = pm_read_status.post_id AND pm_read_status.meta_key = 'mps_read_status'
+         WHERE pm_recipient.meta_value = %d AND pm_read_status.meta_value = 0
+         AND p.post_type = 'mps_message' AND p.post_status = 'publish'",
+        $user_id
+    ));
+    return (int) $count;
+}
+
 // 6. EMAIL SENDER CONFIGURATION
-add_filter('wp_mail_from', function($original_email_address) {
-    return 'enquiries@mypetseitters.com.au';
-});
+add_filter('wp_mail_from', 'antigravity_v200_mail_from_email');
+function antigravity_v200_mail_from_email($original_email_address) {
+    return 'enquiries@mypetsitters.com.au';
+}
 
 add_filter('wp_mail_from_name', function($original_email_from) {
     return 'My Pet Sitters';
 });
+
+

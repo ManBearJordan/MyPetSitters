@@ -22,7 +22,7 @@ add_action('admin_post_mps_delete_account', function() {
     
     // 1. CLEANUP CUSTOM DATA
     // Delete Sitter Profile
-    $sitter_post = mps_get_sitter_post($user_id);
+    $sitter_post = antigravity_v200_get_sitter_post($user_id);
     if ($sitter_post) {
         wp_delete_post($sitter_post->ID, true);
     }
@@ -64,14 +64,37 @@ add_action('admin_post_mps_delete_account', function() {
 });
 
 // OWNER PROFILE PUBLIC VIEW (Restricted to Sitters usually, or public safe info)
+// OWNER/SITTER PROFILE VIEW HANDLER
 add_action('template_redirect', function() {
-    if (isset($_GET['mps_owner_profile'])) {
-        $owner_id = intval($_GET['mps_owner_profile']);
-        $owner = get_userdata($owner_id);
+    $target_user_id = 0;
+    
+    // 1. Check for Standard WP Author Archive (The "View" link)
+    if (is_author()) {
+        $target_user_id = get_queried_object_id();
         
-        if (!$owner) {
-            wp_die('User not found.');
+        // If Sitter: Redirect to their Public Listing
+        $sitter_post = antigravity_v200_get_sitter_post($target_user_id);
+        if ($sitter_post && $sitter_post->post_status === 'publish') {
+            wp_redirect(get_permalink($sitter_post->ID));
+            exit;
         }
+        
+        // If Owner (or sitter with no post): Continue to render Owner Profile logic
+    }
+    
+    // 2. Check for Custom Parameter (Legacy/Manual)
+    if (isset($_GET['mps_owner_profile'])) {
+        $target_user_id = intval($_GET['mps_owner_profile']);
+    }
+
+    if ($target_user_id) {
+        $owner = get_userdata($target_user_id);
+        if (!$owner) wp_die('User not found.');
+        
+        // Security: Only Admins or the user themselves (or sitters with a booking?)
+        // For now, let's keep it visible if they have the link (View link is public-ish in WP)
+        
+        // RENDER PROFILE
         
         // RENDER PROFILE
         get_header();
@@ -161,3 +184,5 @@ add_action('admin_post_mps_update_owner_details', function() {
     wp_safe_redirect(add_query_arg(['tab'=>'profile', 'details_saved'=>'1'], wp_get_referer()));
     exit;
 });
+
+

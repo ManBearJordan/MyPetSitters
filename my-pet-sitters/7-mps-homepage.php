@@ -456,7 +456,8 @@ add_action('wp_head', function() {
         background-size: cover; /* scaling */
         background-position: center bottom;
         background-color: #e6f5ea; /* Fallback color */
-        padding: 180px 20px 100px; /* Increased top padding */
+        padding: 80px 20px 180px; /* Increased bottom padding for dog spacing */
+        margin: 0 -20px 40px; /* Reset top margin to 0 */
         text-align: center;
         position: relative;
         overflow: visible; /* Allow images to pop out */
@@ -721,30 +722,82 @@ add_action('wp_head', function() {
     }
 
     @media (max-width: 768px) {
-        .mps-hero { padding: 60px 16px 120px; }
-        .mps-search-box { flex-direction: column; border-radius: 20px; }
-        .mps-section-columns { flex-direction: column; padding: 40px 20px; gap: 40px; }
-        .mps-col { order: 1; }
-        .mps-img-container { order: 2; margin-top: 20px; }
-        .mps-img-map, .mps-img-steps { height: auto; max-height: 300px; object-position: center; }
-        .mps-list-services-section { margin: 40px 20px; }
-        .mps-list-overlay-content { 
-            position: relative; 
-            padding: 30px; 
-            background: #fff; 
-            border-radius: 20px;
-            margin-top: -50px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            width: 90%;
-            margin-left: auto;
-            margin-right: auto;
+        /* FORCE CENTERED LAYOUT - NO OFFSETS */
+        .mps-home-wrapper {
+            margin: 0 auto;
+            width: 100%;
+            overflow-x: hidden;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Center children */
         }
+        
+        .mps-hero,
+        .mps-services-section,
+        .mps-cities-section,
+        .mps-join-banner,
+        .mps-list-services-section,
+        .mps-section-columns {
+            width: 100% !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+            margin-bottom: 20px !important; /* Force positive bottom margin */
+            max-width: 100% !important;
+            border-radius: 20px !important; /* Consistent rounded look */
+            box-sizing: border-box !important;
+        }
+
+        /* Specific fix for Join Banner to ensure footer space */
+        .mps-join-banner {
+            margin-bottom: 0 !important;
+            padding-bottom: 60px !important;
+        }
+
+        .mps-hero { padding: 60px 20px 180px; }
+        .mps-search-box { flex-direction: column; border-radius: 20px; width: 100%; }
+        
+        /* Fix list width */
+        .mps-list-overlay-content { width: auto; max-width: 100%; padding: 30px 20px; }
+        
+        /* Ensure images don't overflow */
+        img { max-width: 100%; height: auto; }
+        
+        /* Fix Paw Divider centering */
+        .mps-paw-divider { width: 80%; margin: 40px auto; }
+
+        /* FIX JOIN BANNER OVERLAP - Unstack content */
+        .mps-join-overlay {
+            position: relative !important;
+            top: auto !important;
+            left: auto !important;
+            transform: none !important;
+            width: auto !important;
+            margin: -60px 20px 0 !important; /* Pull up slightly over image bottom, but safely */
+            max-width: none !important;
+            padding: 30px !important;
+        }
+
+        /* FIX LIST SERVICES - Hide Image & Clean Card */
         .mps-list-bg-img {
-            height: 300px;
-            object-fit: cover;
-            object-position: center;
+            display: none !important;
         }
-        .mps-features-grid { flex-direction: column; gap: 24px; }
+        .mps-list-overlay-content {
+            position: relative !important;
+            top: auto !important;
+            left: auto !important;
+            transform: none !important;
+            width: auto !important;
+            margin: 0 !important;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1) !important; /* Restore shadow */
+            background: #fff !important;
+            padding: 40px 30px !important;
+            border-radius: 20px !important;
+        }
+        .mps-join-banner-img {
+            height: 200px; /* Reduced height for decorative top part */
+            object-fit: cover;
+        }
     }
         /* Scroll Reveal Animation */
     .reveal {
@@ -764,9 +817,11 @@ add_action('wp_head', function() {
 // [MPS_HOMEPAGE] SHORTCODE
 // ===========================================================================
 
-add_shortcode('mps_homepage', function($atts) {
-    $cities = mps_cities_list();
-    $services = mps_services_map();
+// Converted to named function// Converted to named function (V120 Fix)
+function antigravity_v200_render_homepage($atts) {
+    // Get Data Sources
+    $search_options = function_exists('antigravity_v200_get_search_options') ? antigravity_v200_get_search_options() : [];
+    $services_map = function_exists('antigravity_v200_services_map') ? antigravity_v200_services_map() : [];
     
     // Get featured sitters
     $sitters = get_posts([
@@ -778,6 +833,7 @@ add_shortcode('mps_homepage', function($atts) {
     
     ob_start();
     ?>
+    <div class="mps-home-wrapper">
     
     <!-- HERO SECTION -->
     <section class="mps-hero">
@@ -785,20 +841,48 @@ add_shortcode('mps_homepage', function($atts) {
             <span class="sub-headline">Australia-wide directory of pet sitters & dog walkers</span>
             <h1>Find Trusted Pet Sitters & Dog Walkers Near You</h1>
             
-            <!-- Search Form -->
-            <form class="mps-search-box" action="/" method="get" onsubmit="return mpsSearch(this)">
-                <select name="city" id="mps-city-select">
-                    <option value="">Select City...</option>
-                    <?php foreach ($cities as $city): ?>
-                        <option value="<?= sanitize_title($city) ?>"><?= esc_html($city) ?></option>
-                    <?php endforeach; ?>
-                </select>
-                <select name="service" id="mps-service-select">
-                    <option value="">All Services</option>
-                    <?php foreach ($services as $name => $slug): ?>
-                        <option value="<?= esc_attr($slug) ?>"><?= esc_html($name) ?></option>
-                    <?php endforeach; ?>
-                </select>
+            <!-- Search Form (Refactored for Split Dropdowns) -->
+            <form class="mps-search-box" action="/" method="get" onsubmit="return mpsSubmitSearch(this)">
+                
+                <!-- 1. REGION / CITY SELECT -->
+                <div style="flex: 1; position: relative;">
+                    <select name="region" id="mps-region-select" onchange="mpsRegionChange(this)" required style="width:100%;">
+                        <option value="">Select Region or Major City...</option>
+                        <?php foreach ($search_options as $group_label => $options): ?>
+                            <optgroup label="<?= esc_attr($group_label) ?>">
+                                <?php foreach ($options as $opt): 
+                                    // Determine if this is a region (has suburbs) or a city
+                                    // We assume keys in 'antigravity_v200_get_suburbs_by_region' are regions
+                                    $is_region = false;
+                                    if (function_exists('antigravity_v200_get_suburbs_by_region')) {
+                                        $subs = antigravity_v200_get_suburbs_by_region();
+                                        if (isset($subs[$opt])) $is_region = true;
+                                    }
+                                ?>
+                                    <option value="<?= esc_attr($opt) ?>" data-type="<?= $is_region ? 'region' : 'city' ?>"><?= esc_html($opt) ?></option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <!-- 2. SUBURB SELECT (Dynamic) -->
+                <div style="flex: 1; position: relative; border-left: 1px solid #eee;">
+                    <select name="suburb" id="mps-suburb-select" disabled style="width:100%; background-color: #f9f9f9;">
+                        <option value="">Select Suburb (Choose Region First)</option>
+                    </select>
+                </div>
+
+                <!-- 3. SERVICE SELECT -->
+                <div style="flex: 1; position: relative; border-left: 1px solid #eee;">
+                    <select name="service" id="mps-service-select" style="width:100%;">
+                        <option value="">All Services</option>
+                        <?php foreach ($services_map as $name => $slug): ?>
+                            <option value="<?= esc_attr($slug) ?>"><?= esc_html($name) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
                 <button type="submit" id="mps-hero-search-btn">Search</button>
             </form>
             
@@ -932,11 +1016,22 @@ add_shortcode('mps_homepage', function($atts) {
                 $suburb = get_post_meta($sitter->ID, 'mps_suburb', true);
                 $services_list = get_post_meta($sitter->ID, 'mps_services', true);
                 $services_arr = array_map('trim', explode(',', $services_list));
-                $thumb = get_the_post_thumbnail_url($sitter->ID, 'medium');
+                $thumb = get_the_post_thumbnail_url($sitter->ID, 'full'); // V79 FULL RES IMAGE
                 
-                $first_service = $services_arr[0] ?? '';
-                $price_key = 'mps_price_' . sanitize_title($first_service);
-                $price = get_post_meta($sitter->ID, $price_key, true);
+                // V79 Price Scan Logic
+                $all_svcs_map = function_exists('antigravity_v200_services_map') ? antigravity_v200_services_map() : [];
+                $min_price = 99999;
+                
+                // Check all known service keys for prices
+                foreach ($all_svcs_map as $s_label => $s_slug) {
+                    $p_key = 'mps_price_' . $s_slug;
+                    $p_val = get_post_meta($sitter->ID, $p_key, true);
+                    if ($p_val && is_numeric($p_val) && $p_val > 0 && $p_val < $min_price) {
+                        $min_price = $p_val;
+                    }
+                }
+                $price = ($min_price < 99999) ? $min_price : 0;
+                
                 $name = explode(' - ', $sitter->post_title)[0];
             ?>
             <div class="mps-sitter-card-modern">
@@ -948,7 +1043,19 @@ add_shortcode('mps_homepage', function($atts) {
                 <div class="mps-sitter-info">
                     <h3 class="mps-sitter-name"><?= esc_html($name) ?></h3>
                     <p class="mps-sitter-location">
-                        📍 <?= esc_html($suburb ? "$suburb, $city" : $city) ?>
+                        <?php
+                        // V104: PREFER REGION
+                        $region_term = wp_get_post_terms($sitter->ID, 'mps_region', ['fields' => 'names']);
+                        $region_name = !empty($region_term) ? $region_term[0] : '';
+                        
+                        $loc_str = $city;
+                        if ($suburb) {
+                            $loc_str = $region_name ? "$suburb, $region_name" : "$suburb, $city";
+                        } elseif ($region_name) {
+                            $loc_str = $region_name;
+                        }
+                        ?>
+                        📍 <?= esc_html($loc_str) ?>
                     </p>
                     <div class="mps-sitter-badges">
                         <?php 
@@ -968,7 +1075,7 @@ add_shortcode('mps_homepage', function($atts) {
                     </div>
                     <div class="mps-sitter-price">
                         <div>
-                            <?php if ($price): ?>
+                            <?php if ($price > 0): ?>
                                 <span class="price">From $<?= esc_html($price) ?></span>
                                 <span class="label">per session</span>
                             <?php else: ?>
@@ -1015,41 +1122,88 @@ add_shortcode('mps_homepage', function($atts) {
         <div class="mps-join-overlay">
             <h2>Ready to find care?</h2>
             <p>Connect with trusted local sitters today.</p>
-            <a href="#mps-city-select" class="mps-btn-green" onclick="document.querySelector('.mps-search-box').scrollIntoView({behavior: 'smooth'}); return false;">Find a Sitter</a>
+            <a href="#mps-hero-search-btn" class="mps-btn-green" onclick="document.querySelector('.mps-search-box').scrollIntoView({behavior: 'smooth'}); return false;">Find a Sitter</a>
         </div>
         </div>
     </section>
     
-    </div><!-- .mps-home-wrapper (Footer Fix) -->
+    </div><!-- .mps-home-wrapper -->
 
     <script>
-    function mpsSearch(form) {
-        var city = form.city.value;
+    // GLOBALS FOR AJAX
+    var mpsAjaxUrl = '<?= admin_url('admin-ajax.php') ?>';
+
+    // 1. REGION CHANGE HANDLER
+    function mpsRegionChange(select) {
+        var region = select.value;
+        var suburbSelect = document.getElementById('mps-suburb-select');
+        var selectedOpt = select.options[select.selectedIndex];
+        var type = selectedOpt.getAttribute('data-type');
+
+        // Reset Suburbs
+        suburbSelect.innerHTML = '<option value="">Select Suburb...</option>';
+        suburbSelect.disabled = true;
+        suburbSelect.style.backgroundColor = '#f9f9f9';
+
+        if (type === 'region' && region) {
+            // Fetch Suburbs
+            suburbSelect.innerHTML = '<option value="">Loading...</option>';
+            
+            fetch(mpsAjaxUrl + '?action=antigravity_get_suburbs&region=' + encodeURIComponent(region))
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.data.length > 0) {
+                    var html = '<option value="">All Areas in ' + region + '</option>';
+                    data.data.forEach(sub => {
+                        html += '<option value="' + sub + '">' + sub + '</option>';
+                    });
+                    suburbSelect.innerHTML = html;
+                    suburbSelect.disabled = false;
+                    suburbSelect.style.backgroundColor = '#fff';
+                } else {
+                    suburbSelect.innerHTML = '<option value="">No specific suburbs found</option>';
+                    suburbSelect.disabled = true;
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                suburbSelect.innerHTML = '<option value="">Error loading suburbs</option>';
+            });
+        }
+    }
+
+    // 2. SEARCH SUBMIT HANDLER
+    function mpsSubmitSearch(form) {
+        var region = form.region.value;
+        var suburb = form.suburb.value;
         var service = form.service.value;
-        if (!city) {
-            alert('Please select a city');
+
+        if (!region && !suburb) {
+            alert('Please select a location');
             return false;
         }
-        var url = '/' + city + '/';
-        if (service) url += service + '/';
+
+        // CONSTRUCT URL
+        // If suburb selected: /?s={Suburb}&post_type=sitter
+        // If only region: /?s={Region}&post_type=sitter
+        
+        var query = suburb ? suburb : region;
+        var url = '/?s=' + encodeURIComponent(query) + '&post_type=sitter';
+        
+        // Add service filter if present (usually passed as query param or part of URL structure if we had rewrites)
+        // For standard search, we append it if your search template handles it, or just use keyword match.
+        // Assuming your search loop filters by text, adding service name might help? 
+        // Or if you support /service/location permalinks.
+        
+        // Let's stick to standard WP search query for now, but maybe append service to query string
+        if (service) {
+            // Note: If you have a taxonomy for services, you should use &mps_service=slug etc. 
+            // But relying on text search for now:
+             url += '&service=' + encodeURIComponent(service);
+        }
+
         window.location.href = url;
         return false;
-    }
-    function filterCities() {
-        const input = document.getElementById('citySearch');
-        const filter = input.value.toUpperCase();
-        const cityGrid = document.getElementById('cityGrid');
-        const cities = cityGrid.getElementsByClassName('mps-city-item');
-
-        for (let i = 0; i < cities.length; i++) {
-            const span = cities[i].getElementsByTagName("span")[0];
-            const txtValue = span.textContent || span.innerText;
-            if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                cities[i].style.display = "";
-            } else {
-                cities[i].style.display = "none";
-            }
-        }
     }
 
     // Scroll Reveal Observer
@@ -1070,4 +1224,9 @@ add_shortcode('mps_homepage', function($atts) {
     
     <?php
     return ob_get_clean();
-});
+}
+// Register BOTH names (V120 Fix)
+add_shortcode('mps_homepage', 'antigravity_v200_render_homepage');
+add_shortcode('mps_landing_page', 'antigravity_v200_render_homepage');
+
+

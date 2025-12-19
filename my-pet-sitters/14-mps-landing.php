@@ -8,7 +8,8 @@
 
 if (!defined('ABSPATH')) exit;
 
-add_shortcode('mps_sitter_landing', function() {
+// Converted to named function (V120 Fix)
+function antigravity_v200_render_sitter_landing() {
     if (is_user_logged_in()) {
         echo '<script>window.location.href="/edit-profile/";</script>';
         return;
@@ -132,4 +133,9 @@ add_shortcode('mps_sitter_landing', function() {
     </div>
     <?php
     return ob_get_clean();
-});
+}
+// Register BOTH names (V120 Fix)
+add_shortcode('mps_sitter_landing', 'antigravity_v200_render_sitter_landing');
+add_shortcode('mps_sitter_registration', 'antigravity_v200_render_sitter_landing');
+
+

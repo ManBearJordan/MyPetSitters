@@ -8,12 +8,24 @@
 
 if (!defined('ABSPATH')) exit;
 
-add_shortcode('mps_dashboard', function() {
+add_shortcode('mps_dashboard', 'antigravity_v200_render_dashboard');
+function antigravity_v200_render_dashboard() {
     if (!is_user_logged_in()) {
         return '<script>window.location.href="/login/";</script>';
     }
 
     $user = wp_get_current_user();
+    
+    // ADMIN VIEWER MODE
+    $is_viewing = false;
+    if (isset($_GET['view_user_id']) && current_user_can('manage_options')) {
+        $target_id = intval($_GET['view_user_id']);
+        $target_user = get_userdata($target_id);
+        if ($target_user) {
+            $user = $target_user;
+            $is_viewing = true;
+        }
+    }
     $is_sitter = in_array('pro', (array)$user->roles) || in_array('sitter', (array)$user->roles) || in_array('administrator', (array)$user->roles);
     $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'overview';
     
@@ -36,6 +48,12 @@ add_shortcode('mps_dashboard', function() {
     ob_start();
     ?>
     <div class="mps-dashboard-wrapper">
+        <?php if ($is_viewing): ?>
+            <div style="background:#fff3cd;color:#856404;padding:12px;border:1px solid #ffeeba;border-radius:6px;margin-bottom:20px;text-align:center;">
+                <strong>👁️ Admin Mode:</strong> You are viewing the dashboard as <u><?= esc_html($user->display_name) ?></u>. 
+                <a href="<?= admin_url('user-edit.php?user_id='.$user->ID) ?>">Edit User</a> | <a href="<?= remove_query_arg('view_user_id') ?>">Exit View</a>
+            </div>
+        <?php endif; ?>
         <!-- HEADER -->
         <div class="mps-dash-head" style="margin-bottom:24px;border-bottom:1px solid #eee;padding-bottom:16px;">
             <h2 style="margin:0;">Welcome, <?= esc_html($user->display_name) ?></h2>
@@ -46,8 +64,9 @@ add_shortcode('mps_dashboard', function() {
         <div class="mps-tabs-nav" style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;border-bottom:1px solid #ddd;">
             <?php foreach ($tabs as $key => $tab): 
                 $active = ($key === $active_tab) ? 'border-bottom:2px solid #2e7d32;color:#2e7d32;font-weight:bold;' : 'color:#555;';
+                $link = add_query_arg(['tab' => $key]);
             ?>
-                <a href="?tab=<?= $key ?>" style="padding:10px 16px;text-decoration:none;<?= $active ?>">
+                <a href="<?= esc_url($link) ?>" style="padding:10px 16px;text-decoration:none;<?= $active ?>">
                     <?= $tab['icon'] ?> <?= $tab['label'] ?>
                 </a>
             <?php endforeach; ?>
@@ -63,8 +82,8 @@ add_shortcode('mps_dashboard', function() {
             ?>
                 <div style="padding:20px;background:#f9f9f9;border-radius:8px;">
                     <h3>Quick Status</h3>
-                    <p>You have <strong><?= mps_count_unread_messages($user->ID) ?></strong> unread messages.</p>
-                    <p>You have <strong><?= mps_count_pending_bookings($user->ID, $is_sitter) ?></strong> pending bookings.</p>
+                    <p>You have <strong><?= antigravity_v200_count_unread_messages($user->ID) ?></strong> unread messages.</p>
+                    <p>You have <strong><?= antigravity_v200_count_pending_bookings($user->ID, $is_sitter) ?></strong> pending bookings.</p>
                 </div>
             
             <?php 
@@ -74,7 +93,7 @@ add_shortcode('mps_dashboard', function() {
             
             // --- TAB: BOOKINGS ---
             elseif ($active_tab === 'bookings'):
-                mps_render_bookings_tab($user->ID, $is_sitter);
+                antigravity_v200_render_bookings_tab($user->ID, $is_sitter);
             
             // --- TAB: CALENDAR (Sitter) ---
             elseif ($active_tab === 'calendar' && $is_sitter):
@@ -82,11 +101,11 @@ add_shortcode('mps_dashboard', function() {
                 
             // --- TAB: PETS (Owner) ---
             elseif ($active_tab === 'pets' && !$is_sitter):
-                mps_render_pets_tab($user->ID);
+                antigravity_v200_render_pets_tab($user->ID);
                 
             // --- TAB: FAVORITES (Owner) ---
             elseif ($active_tab === 'favorites' && !$is_sitter):
-                $favs = function_exists('mps_get_user_favorites') ? mps_get_user_favorites($user->ID) : [];
+                $favs = function_exists('antigravity_v200_get_user_favorites') ? antigravity_v200_get_user_favorites($user->ID) : [];
                 if ($favs) {
                     echo '<h3>My Favorite Sitters</h3>';
                     echo '<div class="mps-dash-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(250px, 1fr));gap:20px;">';
@@ -106,7 +125,8 @@ add_shortcode('mps_dashboard', function() {
             // --- TAB: PROFILE ---
             elseif ($active_tab === 'profile'):
                 if ($is_sitter) {
-                    echo do_shortcode('[mps_edit_profile]');
+                    $sc = $is_viewing ? '[mps_edit_profile user_id="'.$user->ID.'"]' : '[mps_edit_profile]';
+                    echo do_shortcode($sc);
                 } else {
                      // OWNER PROFILE (Extended)
                      $meta_phone = get_user_meta($user->ID, 'mps_phone', true);
@@ -163,11 +183,11 @@ add_shortcode('mps_dashboard', function() {
     </div>
     <?php
     return ob_get_clean();
-});
+}
 
 // --- HELPER RENDERS ---
 
-function mps_render_pets_tab($user_id) {
+function antigravity_v200_render_pets_tab($user_id) {
     if (isset($_GET['action']) && ($_GET['action'] === 'add' || $_GET['action'] === 'edit')) {
         // ADD/EDIT FORM
         require_once plugin_dir_path(__FILE__) . '12-mps-pets.php';
@@ -202,9 +222,9 @@ function mps_render_pets_tab($user_id) {
         ?>
         <h3><?= $title ?></h3>
         <form method="post" action="<?= esc_url(admin_url('admin-post.php')) ?>" enctype="multipart/form-data" style="max-width:600px;">
-            <input type="hidden" name="action" value="mps_save_pet">
+            <input type="hidden" name="action" value="antigravity_v200_save_pet">
             <?php if ($is_edit) echo '<input type="hidden" name="pet_id" value="'.$pet_data['ID'].'">'; ?>
-            <?php wp_nonce_field('mps_save_pet'); ?>
+            <?php wp_nonce_field('antigravity_v200_save_pet'); ?>
             
             <p>
                 <label>Name * <input type="text" name="pet_name" value="<?= $is_edit ? esc_attr($pet_data['post_title']) : '' ?>" required style="width:100%;padding:8px;"></label>
@@ -270,7 +290,7 @@ function mps_render_pets_tab($user_id) {
         <?php
     } else {
         // LIST
-        $pets = mps_get_user_pets($user_id);
+        $pets = antigravity_v200_get_user_pets($user_id);
         echo '<a href="?tab=pets&action=add" class="button" style="background:#2e7d32;color:#fff;margin-bottom:20px;padding:10px 20px;text-decoration:none;display:inline-block;border-radius:4px;">+ Add New Pet</a>';
         
         if ($pets) {
@@ -282,7 +302,7 @@ function mps_render_pets_tab($user_id) {
                 // Clickable Area for Edit
                 echo '<a href="?tab=pets&action=edit&pet_id='.$pet->ID.'" style="text-decoration:none;color:inherit;">';
                 
-                if ($img) echo '<img src="' . esc_url($img) . '" style="width:100%;height:180px;object-fit:cover;border-radius:4px;margin-bottom:10px;">';
+                if ($img) echo '<img src="' . esc_url(get_the_post_thumbnail_url($pet->ID, 'large')) . '" style="width:100%;height:auto;max-height:300px;object-fit:contain;background:#f8f9fa;border-radius:4px;margin-bottom:10px;">';
                 
                 // Name & Basic Info
                 $type = $meta['mps_pet_type'][0] ?? '';
@@ -325,7 +345,7 @@ function mps_render_pets_tab($user_id) {
     }
 }
 
-function mps_render_bookings_tab($user_id, $is_sitter) {
+function antigravity_v200_render_bookings_tab($user_id, $is_sitter) {
     // Determine meta query based on role
     $meta_key = $is_sitter ? 'mps_sitter_id' : 'mps_owner_id';
     
@@ -388,7 +408,7 @@ function mps_render_bookings_tab($user_id, $is_sitter) {
 }
 
 // Counts for Overview
-function mps_count_unread_messages($user_id) {
+function antigravity_v200_count_unread_messages($user_id) {
     global $wpdb;
     return $wpdb->get_var($wpdb->prepare(
         "SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key = 'mps_recipient_id' AND meta_value = %d AND post_id IN (SELECT ID FROM {$wpdb->posts} WHERE post_type = 'mps_message') AND post_id IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = 'mps_read_status' AND meta_value = '0')",
@@ -396,7 +416,7 @@ function mps_count_unread_messages($user_id) {
     ));
 }
 
-function mps_count_pending_bookings($user_id, $is_sitter) {
+function antigravity_v200_count_pending_bookings($user_id, $is_sitter) {
     $meta_key = $is_sitter ? 'mps_sitter_id' : 'mps_owner_id';
     $args = [
         'post_type' => 'mps_booking',
@@ -407,3 +427,5 @@ function mps_count_pending_bookings($user_id, $is_sitter) {
     ];
     return count(get_posts($args));
 }
+
+

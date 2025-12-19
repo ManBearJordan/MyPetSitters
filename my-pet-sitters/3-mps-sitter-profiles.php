@@ -41,29 +41,63 @@ add_filter('the_content', function($content) {
     $title_raw = get_the_title($ID);
     $title = $clean($title_raw);
     
-    $meta = mps_get_sitter_meta($ID);
+    $meta = antigravity_v200_get_sitter_meta($ID);
     
     // Clean meta fields
     $meta['city'] = $clean($meta['city']);
     $meta['suburb'] = $clean($meta['suburb']);
     $meta['services'] = array_map($clean, $meta['services']);
     
-    $img = mps_get_sitter_thumbnail($ID);
+    // V77 Hi-Res Image
+    $img = '';
+    if (has_post_thumbnail($ID)) {
+        $img = get_the_post_thumbnail_url($ID, 'large');
+    }
     $bio = get_post_field('post_content', $ID);
     
     // Build meta line
-    $meta_parts = array_filter([
-        $meta['suburb'],
-        $meta['city'],
-    ]);
-    $meta_line = implode(' &bull; ', $meta_parts);
+    // Build meta line (V75 Regional Update)
+    $location_parts = [];
+    if (!empty($meta['suburb'])) {
+        $location_parts[] = $meta['suburb'];
+    }
+    
+    // Check if we have regional data
+    $region_term = wp_get_post_terms($ID, 'mps_region', ['fields' => 'names']);
+    $region_name = !empty($region_term) ? $region_term[0] : '';
+    $state_code  = get_post_meta($ID, 'mps_state', true);
+    
+    if ($region_name) {
+        $location_parts[] = $region_name;
+    } elseif (!empty($meta['city'])) {
+        $location_parts[] = $meta['city'];
+    }
+    
+    if ($state_code) {
+        $location_parts[] = $state_code;
+    }
+    
+    $meta_line = implode(', ', $location_parts);
+    
+    // Append Radius if set
+    $radius = get_post_meta($ID, 'mps_radius', true);
+    if ($radius) {
+        $meta_line .= ' &bull; ' . esc_html($radius) . 'km radius';
+    }
+    
+    // Append Location Type badge if Rural
+    $loc_type = get_post_meta($ID, 'mps_location_type', true);
+    if ($loc_type === 'Rural') {
+         $meta_line .= ' <span style="background:#e8f0ea;color:#2e7d32;padding:2px 8px;border-radius:12px;font-size:0.8em;vertical-align:middle;margin-left:8px;">Rural</span>';
+    }
     
     ob_start();
     ?>
     <style>
         /* Force Full Width & Hide Sidebar/Comments */
         .site-content, .content-area, #primary { width: 100% !important; max-width: 100% !important; float: none !important; margin: 0 !important; }
-        #secondary, .widget-area, .sidebar, #comments, .post-navigation, .entry-footer, .entry-meta { display: none !important; }
+        /* Only hide Sidebar widgets, not ALL widgets (footer) */
+        #secondary, .sidebar, #comments, .post-navigation, .entry-meta { display: none !important; }
         .entry-content { max-width: 1100px !important; margin: 0 auto !important; width: 100% !important; padding:0 !important; }
         
         /* Layout */
@@ -85,10 +119,10 @@ add_filter('the_content', function($content) {
                     
                     <div style="padding:24px;">
                         <h1 style="margin:0 0 8px;font-size:1.8rem;line-height:1.2;"><?= esc_html($title) ?></h1>
-                        <p style="color:#666;margin:0 0 16px;"><?= esc_html($meta_line) ?></p>
+                        <p style="color:#666;margin:0 0 16px;"><?= wp_kses_post($meta_line) ?></p>
                         
                         <div style="display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;">
-                            <?= function_exists('mps_get_rating_html') ? mps_get_rating_html($ID) : '' ?>
+                            <?= function_exists('antigravity_v200_get_rating_html') ? antigravity_v200_get_rating_html($ID) : '' ?>
                             <?= do_shortcode('[mps_favorite_btn sitter_id="'.$ID.'"]') ?>
                         </div>
 
@@ -116,13 +150,41 @@ add_filter('the_content', function($content) {
             
             <!-- RIGHT COLUMN: Bio, Booking Form, Reviews -->
             <main>
+                <!-- CONTACT INFO (Public if enabled) -->
+                <?php
+                // CONTACT VISIBILITY LOGIC
+                $show_phone = get_post_meta($ID, 'mps_show_phone', true);
+                $show_email = get_post_meta($ID, 'mps_show_email', true);
+                $sitter_phone = get_post_meta($ID, 'mps_phone', true);
+                $sitter_email = get_post_meta($ID, 'mps_email', true);
+                
+                if ($show_phone || $show_email):
+                ?>
+                <div style="background:#e8f0ea;border:1px solid #c3e6cb;padding:16px;border-radius:12px;margin-bottom:24px;">
+                    <h4 style="margin:0 0 12px;color:#2e7d32;font-size:1.1em;">Direct Contact</h4>
+                    <?php if ($show_phone && $sitter_phone): ?>
+                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+                            <span style="font-size:1.2em;background:#fff;padding:8px;border-radius:50%;">📞</span>
+                            <a href="tel:<?= esc_attr($sitter_phone) ?>" style="color:#2c3e50;text-decoration:none;font-weight:600;font-size:1.1em;"><?= esc_html($sitter_phone) ?></a>
+                        </div>
+                    <?php endif; ?>
+                    <?php if ($show_email && $sitter_email): ?>
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <span style="font-size:1.2em;background:#fff;padding:8px;border-radius:50%;">✉️</span>
+                            <a href="mailto:<?= esc_attr($sitter_email) ?>" style="color:#2c3e50;text-decoration:none;font-weight:600;font-size:1.1em;"><?= esc_html($sitter_email) ?></a>
+                        </div>
+                    <?php endif; ?>
+                    <p style="margin:12px 0 0;font-size:0.9em;color:#666;">You can contact this sitter directly or use the booking form below.</p>
+                </div>
+                <?php endif; ?>
+
                 <!-- HIDDEN BOOKING FORM -->
                 <div id="mps-booking-form" style="display:none;margin-bottom:40px;padding:24px;border:2px solid #2e7d32;background:#f0fff4;border-radius:12px;">
             <h3 style="margin-top:0;">Request Booking</h3>
             <?php 
             if (is_user_logged_in()): 
                 // Get Unavailable Dates
-                $disabled_dates = function_exists('mps_get_unavailable_dates') ? mps_get_unavailable_dates($post->post_author) : [];
+                $disabled_dates = function_exists('antigravity_v200_get_unavailable_dates') ? antigravity_v200_get_unavailable_dates($post->post_author) : [];
                 $json_dates = json_encode($disabled_dates);
             ?>
                 <form method="post" action="<?= esc_url(admin_url('admin-post.php')) ?>">
@@ -224,7 +286,7 @@ add_filter('the_content', function($content) {
             $comments = get_comments(['post_id' => $ID, 'status' => 'approve']);
             if ($comments) {
                 echo '<ul class="comment-list" style="padding:0;margin:0;">';
-                wp_list_comments(['type' => 'comment', 'callback' => 'mps_review_callback'], $comments);
+                wp_list_comments(['type' => 'comment', 'callback' => 'antigravity_v200_review_callback'], $comments);
                 echo '</ul>';
             } else {
                 echo '<p style="color:#666;font-style:italic;">No reviews yet.</p>';
@@ -275,6 +337,11 @@ add_filter('the_content', function($content) {
 add_filter('the_content', function($content) {
     if (!is_page() || !in_the_loop() || !is_main_query()) return $content;
     
+    // Prevent double listing if sitters are already present (e.g. via shortcode)
+    if (strpos($content, 'mps-results') !== false || has_shortcode(get_post()->post_content, 'mps_sitters')) {
+        return $content;
+    }
+    
     // Only target URLs like /cities/{city}/ or /cities/{city}/{service}/
     $req = trim(parse_url(add_query_arg([]), PHP_URL_PATH), '/');
     $parts = explode('/', $req);
@@ -291,7 +358,7 @@ add_filter('the_content', function($content) {
         $city_name = $page_title;
     }
     if (!$city_name) {
-        foreach (mps_cities_list() as $c) {
+        foreach (antigravity_v200_cities_list() as $c) {
             if (sanitize_title($c) === $city_slug) {
                 $city_name = $c;
                 break;
@@ -303,7 +370,7 @@ add_filter('the_content', function($content) {
     $service_label = '';
     if (isset($parts[2]) && $parts[2] !== '') {
         $service_slug = sanitize_title($parts[2]);
-        foreach (mps_services_map() as $label => $slug) {
+        foreach (antigravity_v200_services_map() as $label => $slug) {
             if ($slug === $service_slug) {
                 $service_label = $label;
                 break;
@@ -342,8 +409,8 @@ add_filter('the_content', function($content) {
     
     while ($q->have_posts()) {
         $q->the_post();
-        $meta = mps_get_sitter_meta(get_the_ID());
-        $thumb = mps_get_sitter_thumbnail(get_the_ID());
+        $meta = antigravity_v200_get_sitter_meta(get_the_ID());
+        $thumb = antigravity_v200_get_sitter_thumbnail(get_the_ID());
         
         $meta_parts = array_filter([
             $meta['suburb'],
@@ -368,10 +435,10 @@ add_filter('the_content', function($content) {
                     <a href="<?= esc_url(get_permalink()) ?>" style="text-decoration:none;"><?= esc_html(get_the_title()) ?></a>
                 </h4>
                 <div style="margin-bottom:6px;">
-                    <?= function_exists('mps_get_rating_html') ? mps_get_rating_html(get_the_ID(), false) : '' ?>
+                    <?= function_exists('antigravity_v200_get_rating_html') ? antigravity_v200_get_rating_html(get_the_ID(), false) : '' ?>
                 </div>
                 <?php if ($meta_parts): ?>
-                    <p class="mps-card-meta" style="margin:0 0 .5rem;opacity:.8;"><?= esc_html(implode(' ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ ', $meta_parts)) ?></p>
+                    <p class="mps-card-meta" style="margin:0 0 .5rem;opacity:.8;"><?= esc_html(implode(' &bull; ', $meta_parts)) ?></p>
                 <?php endif; ?>
                 <?php if ($meta['services']): ?>
                     <p class="mps-card-services" style="margin:0 0 .75rem;">
@@ -391,3 +458,5 @@ add_filter('the_content', function($content) {
     
     return $content . ob_get_clean();
 }, 15);
+
+

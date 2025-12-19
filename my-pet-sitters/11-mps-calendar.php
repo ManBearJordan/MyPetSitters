@@ -11,15 +11,15 @@
 if (!defined('ABSPATH')) exit;
 
 // 1. GET/SET HELPERS
-function mps_get_unavailable_dates($user_id) {
+function antigravity_v200_get_unavailable_dates($user_id) {
     $dates = get_user_meta($user_id, 'mps_unavailable_dates', true);
     return is_array($dates) ? $dates : [];
 }
 
-function mps_toggle_date_availability($user_id, $date) {
+function antigravity_v200_toggle_date_availability($user_id, $date) {
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) return false;
     
-    $dates = mps_get_unavailable_dates($user_id);
+    $dates = antigravity_v200_get_unavailable_dates($user_id);
     
     if (in_array($date, $dates)) {
         // Remove (Make Available)
@@ -34,8 +34,8 @@ function mps_toggle_date_availability($user_id, $date) {
 }
 
 // 2. AJAX HANDLER
-add_action('wp_ajax_mps_toggle_date', 'mps_ajax_toggle_date');
-function mps_ajax_toggle_date() {
+add_action('wp_ajax_mps_toggle_date', 'antigravity_v200_ajax_toggle_date');
+function antigravity_v200_ajax_toggle_date() {
     if (!is_user_logged_in()) wp_die();
     check_ajax_referer('mps_cal_nonce', 'nonce');
     
@@ -45,13 +45,15 @@ function mps_ajax_toggle_date() {
     // Only 'pro' / 'sitter' can do this? 
     // Assuming yes, but capability check is implicitly "can edit own profile"
     
-    mps_toggle_date_availability($user_id, $date);
+    antigravity_v200_toggle_date_availability($user_id, $date);
     
-    wp_send_json_success(['dates' => mps_get_unavailable_dates($user_id)]);
+    wp_send_json_success(['dates' => antigravity_v200_get_unavailable_dates($user_id)]);
 }
 
 // 3. DASHBOARD EDITOR SHORTCODE
-add_shortcode('mps_availability_editor', function() {
+// [mps_availability_calendar] SHORTCODE
+add_shortcode('mps_availability_calendar', 'antigravity_v200_calendar_shortcode');
+function antigravity_v200_calendar_shortcode($atts) {
     if (!is_user_logged_in()) return '';
     
     $user_id = get_current_user_id();
@@ -59,7 +61,7 @@ add_shortcode('mps_availability_editor', function() {
     
     // We will render a simple visual calendar for the next 3 months
     $months_to_show = 3;
-    $unavailable = mps_get_unavailable_dates($user_id);
+    $unavailable = antigravity_v200_get_unavailable_dates($user_id);
     
     ob_start();
     ?>
@@ -148,7 +150,7 @@ add_shortcode('mps_availability_editor', function() {
     </div>
     <?php
     return ob_get_clean();
-});
+}
 
 // 4. LOAD FLATPICKR ASSETS (Frontend support)
 add_action('wp_footer', function() {
@@ -157,3 +159,5 @@ add_action('wp_footer', function() {
         echo '<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>';
     }
 });
+
+

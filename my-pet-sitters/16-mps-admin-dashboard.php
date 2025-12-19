@@ -10,26 +10,40 @@
 
 if (!defined('ABSPATH')) exit;
 
-add_action('admin_menu', function() {
+// 1. ADD MENU ITEM
+add_action('admin_menu', 'antigravity_v200_add_admin_menu');
+function antigravity_v200_add_admin_menu() {
     add_menu_page(
-        'Pet Sitters', 'Pet Sitters', 'manage_options', 'mps-admin', 'mps_render_admin_home', 'dashicons-pets', 6
+        'My Pet Sitters', 'Pet Sitters', 'manage_options', 'mps-dashboard', 'antigravity_v200_render_admin_home', 'dashicons-pets', 6
     );
     add_submenu_page(
-        'mps-admin', 'Bookings', 'Bookings', 'manage_options', 'mps-admin-bookings', 'mps_render_admin_bookings'
+        'mps-dashboard', 'Bookings', 'Bookings', 'manage_options', 'mps-admin-bookings', 'antigravity_v200_render_admin_bookings'
     );
     add_submenu_page(
-        'mps-admin', 'Messages', 'Messages', 'manage_options', 'mps-admin-messages', 'mps_render_admin_messages'
+        'mps-dashboard', 'Messages', 'Messages', 'manage_options', 'mps-admin-messages', 'antigravity_v200_render_admin_messages'
     );
     add_submenu_page(
-        'mps-admin', 'Add New User', 'Add User', 'manage_options', 'mps-admin-add-user', 'mps_render_admin_add_user'
+        'mps-dashboard', 'Add New User', 'Add User', 'manage_options', 'mps-admin-add-user', 'antigravity_v200_render_admin_add_user'
     );
     add_submenu_page(
-        'mps-admin', 'Communication', 'Communication', 'manage_options', 'mps-admin-comm', 'mps_render_admin_communication'
+        'mps-dashboard', 'Communication', 'Communication', 'manage_options', 'mps-admin-comm', 'antigravity_v200_render_admin_communication'
     );
-});
+}
 
 // Handle Admin Actions
-add_action('admin_init', function() {
+// V110 Restoration: Removed Self-Healing hooks.
+/*
+add_action('admin_init', function() { ... });
+*/
+
+// SEPARATE ACTION: Create User Logic (Moved outside admin_init closure if needed, but keeping inside for now as original design intended logic to be here, but wait... original file had MULTIPLE if blocks inside one admin_init closure.
+// My previous edit might have unintentionally closed the closure early.
+// To be safe, I will hook a SECOND admin_init for Create User, or merge properly.)
+
+add_action('admin_init', 'antigravity_v200_handle_admin_actions');
+function antigravity_v200_handle_admin_actions() {
+    // CREATE USER BLOCK
+
     // CREATE USER
     if (isset($_POST['mps_admin_action']) && $_POST['mps_admin_action'] == 'create_user') {
         check_admin_referer('mps_admin_create_user');
@@ -98,8 +112,8 @@ add_action('admin_init', function() {
         update_post_meta($msg_id, 'mps_read_status', 0);
         
         // Trigger Email Notification (Reuse existing function if possible, or manual)
-        if (function_exists('mps_notify_message')) {
-            mps_notify_message($msg_id, $sender_id, $recipient->ID);
+        if (function_exists('antigravity_v200_notify_message')) {
+            antigravity_v200_notify_message($msg_id, $sender_id, $recipient->ID, $message_content);
         } else {
             // Manual fallback
             $link = home_url('/messages/');
@@ -112,10 +126,10 @@ add_action('admin_init', function() {
         wp_redirect(admin_url('admin.php?page=mps-admin-comm&sent=1'));
         exit;
     }
-});
+}
 
 // 1. HOME / OVERVIEW
-function mps_render_admin_home() {
+function antigravity_v200_render_admin_home() {
     // Stats
     $sitter_count = count(get_posts(['post_type'=>'sitter','numberposts'=>-1]));
     $booking_count = count(get_posts(['post_type'=>'mps_booking','numberposts'=>-1]));
@@ -178,7 +192,7 @@ function mps_render_admin_home() {
 }
 
 // 2. BOOKINGS TABLE
-function mps_render_admin_bookings() {
+function antigravity_v200_render_admin_bookings() {
     ?>
     <div class="wrap">
         <h1>Bookings Management</h1>
@@ -222,7 +236,7 @@ function mps_render_admin_bookings() {
 }
 
 // 3. MESSAGES TABLE
-function mps_render_admin_messages() {
+function antigravity_v200_render_admin_messages() {
     ?>
     <div class="wrap">
         <h1>Messages Log</h1>
@@ -260,7 +274,7 @@ function mps_render_admin_messages() {
 }
 
 // 4. ADD USER
-function mps_render_admin_add_user() {
+function antigravity_v200_render_admin_add_user() {
     if (isset($_GET['created'])) echo '<div class="updated"><p>User created successfully!</p></div>';
     ?>
     <div class="wrap">
@@ -303,7 +317,7 @@ function mps_render_admin_add_user() {
 }
 
 // 5. COMMUNICATION
-function mps_render_admin_communication() {
+function antigravity_v200_render_admin_communication() {
     if (isset($_GET['sent'])) echo '<div class="updated"><p>Message sent successfully!</p></div>';
     ?>
     <div class="wrap">
@@ -331,3 +345,5 @@ function mps_render_admin_communication() {
     </div>
     <?php
 }
+
+

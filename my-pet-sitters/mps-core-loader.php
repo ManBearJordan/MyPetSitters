@@ -1,17 +1,14 @@
 <?php
 /**
  * Plugin Name: MPS Core Loader - FIXED
- * Description: Safely loads the MPS Core snippet from mps-snippets. (v2.45.0 - PROFILE SKILLS)
+ * Description: Safely loads the MPS Core files from the plugin directory. (v2.45.0 - PROFILE SKILLS)
  * Version: 2.45.0
  */
 
 if (!defined('ABSPATH')) exit;
 
-// Force Menu Setup (Runs on init)
-require_once plugin_dir_path(__FILE__) . 'force-menu-setup.php';
-
-// Force Page Content Fix (Runs on init) - V14
-require_once plugin_dir_path(__FILE__) . 'force-page-fix.php';
+// Force Menu Setup (Runs on init) - REMOVED during cleanup
+// Force Page Content Fix (Runs on init) - REMOVED during cleanup
 
 $core_files = [
     '1-mps-core.php',
@@ -33,6 +30,7 @@ $core_files = [
     '17-mps-emails.php',
     '18-mps-security.php',
     '19-mps-edit-profile.php',
+    '20-mps-contact.php',
     'mps-installer.php'
 ];
 
@@ -44,12 +42,12 @@ foreach ($core_files as $file) {
 }
 
 // REGISTER ACTIVATION HOOK
-register_activation_hook(__FILE__, 'mps_run_installer');
+register_activation_hook(__FILE__, 'antigravity_v200_installer');
 
 // AUTO-REPAIR: Check for missing pages on admin init (Fixes 404s if installer didn't run)
-add_action('admin_init', 'mps_check_pages_exist');
-function mps_check_pages_exist() {
-    if (get_option('mps_pages_checked_v41')) return;
+add_action('admin_init', 'antigravity_v200_check_pages');
+function antigravity_v200_check_pages() {
+    if (get_option('mps_pages_checked_v200')) return;
     
     $required = [
         'edit-profile' => '[mps_edit_profile]',
@@ -70,6 +68,8 @@ function mps_check_pages_exist() {
             ]);
         }
     }
-    update_option('mps_pages_checked_v41', time());
+    update_option('mps_pages_checked_v200', time());
 }
+
+
 
