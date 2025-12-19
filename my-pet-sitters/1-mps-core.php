@@ -1671,55 +1671,62 @@ add_action('wp_ajax_antigravity_get_suburbs', 'antigravity_get_suburbs_handler')
 add_action('wp_ajax_nopriv_antigravity_get_suburbs', 'antigravity_get_suburbs_handler');
 
 function antigravity_get_suburbs_handler() {
-    $region_name = isset($_POST['region']) ? sanitize_text_field($_POST['region']) : '';
-    
-    if (empty($region_name)) {
-        wp_send_json_error(['message' => 'No region provided']);
-    }
+    try {
+        $region_name = isset($_POST['region']) ? sanitize_text_field($_POST['region']) : '';
+        
+        if (empty($region_name)) {
+            wp_send_json_error(['message' => 'No region provided']);
+        }
 
-    // 1. Find all Sitter Posts in this Region
-    // We query for posts that have the selected 'mps_region' term
-    $args = [
-        'post_type' => 'sitter',
-        'post_status' => 'publish',
-        'posts_per_page' => -1, // Get all to ensure we find all suburbs
-        'tax_query' => [
-            [
-                'taxonomy' => 'mps_region',
-                'field'    => 'name',
-                'terms'    => $region_name,
+        // 1. Find all Sitter Posts in this Region
+        // We query for posts that have the selected 'mps_region' term
+        $args = [
+            'post_type' => 'sitter',
+            'post_status' => 'publish',
+            'posts_per_page' => -1, // Get all to ensure we find all suburbs
+            'tax_query' => [
+                [
+                    'taxonomy' => 'mps_region',
+                    'field'    => 'name',
+                    'terms'    => $region_name,
+                ]
             ]
-        ]
-    ];
+        ];
 
-    $query = new WP_Query($args);
-    $found_suburbs = [];
+        $query = new WP_Query($args);
+        $found_suburbs = [];
 
-    // 2. Extract Suburbs (mps_city) from those Sitters
-    if ($query->have_posts()) {
-        foreach ($query->posts as $post) {
-            // Try to get the suburb from the 'mps_city' taxonomy first (preferred)
-            $terms = get_the_terms($post->ID, 'mps_city');
-            if ($terms && !is_wp_error($terms)) {
-                foreach ($terms as $term) {
-                    $found_suburbs[] = $term->name;
+        // 2. Extract Suburbs (mps_city) from those Sitters
+        if ($query->have_posts()) {
+            foreach ($query->posts as $post) {
+                // Try to get the suburb from the 'mps_city' taxonomy first (preferred)
+                $terms = get_the_terms($post->ID, 'mps_city');
+                if ($terms && !is_wp_error($terms)) {
+                    foreach ($terms as $term) {
+                        $found_suburbs[] = $term->name;
+                    }
+                }
+                
+                // Fallback: Check custom field 'mps_suburb' if taxonomy is empty
+                $meta_suburb = get_post_meta($post->ID, 'mps_suburb', true);
+                if ($meta_suburb) {
+                    $found_suburbs[] = trim($meta_suburb);
                 }
             }
-            
-            // Fallback: Check custom field 'mps_suburb' if taxonomy is empty
-            $meta_suburb = get_post_meta($post->ID, 'mps_suburb', true);
-            if ($meta_suburb) {
-                $found_suburbs[] = trim($meta_suburb);
-            }
         }
+
+        // 3. Clean up list
+        $found_suburbs = array_unique($found_suburbs);
+        sort($found_suburbs);
+
+        // 4. Return Data
+        // If no specific suburbs found (e.g., region has sitters but no suburb data),
+        // return empty so frontend handles it gracefully.
+        wp_send_json_success($found_suburbs);
+        
+    } catch (Exception $e) {
+        // Log error (optional) and return strict failure
+        error_log('MPS AJAX Error: ' . $e->getMessage());
+        wp_send_json_error(['message' => 'Internal Server Error']);
     }
-
-    // 3. Clean up list
-    $found_suburbs = array_unique($found_suburbs);
-    sort($found_suburbs);
-
-    // 4. Return Data
-    // If no specific suburbs found (e.g., region has sitters but no suburb data),
-    // return empty so frontend handles it gracefully.
-    wp_send_json_success($found_suburbs);
 }
