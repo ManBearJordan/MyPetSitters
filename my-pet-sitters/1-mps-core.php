@@ -1664,62 +1664,38 @@ add_action('init', function() {
 
 
 
-add_action('wp_ajax_antigravity_get_suburbs', 'antigravity_v200_ajax_get_suburbs');
+// ===========================================================================
+// AJAX HANDLER FOR SUBURBS (REQUIRED FOR SEARCH)
+// ===========================================================================
+add_action('wp_ajax_antigravity_get_suburbs', 'antigravity_get_suburbs_handler');
+add_action('wp_ajax_nopriv_antigravity_get_suburbs', 'antigravity_get_suburbs_handler');
 
-add_action('wp_ajax_nopriv_antigravity_get_suburbs', 'antigravity_v200_ajax_get_suburbs');
-
-
-
-function antigravity_v200_ajax_get_suburbs() {
-
-    // Sanitize Input
-
-    $region = isset($_GET['region']) ? sanitize_text_field($_GET['region']) : '';
-
+function antigravity_get_suburbs_handler() {
+    // 1. Get the Region Name from POST
+    $region_name = isset($_POST['region']) ? sanitize_text_field($_POST['region']) : '';
     
-
-    if (empty($region)) {
-
-        wp_send_json_error(['message' => 'No region specified']);
-
+    if (empty($region_name)) {
+        wp_send_json_error(['message' => 'No region provided']);
     }
 
-    
+    // 2. Query 'mps_city' taxonomy
+    $suburbs = [];
 
-    // Get Data
+    // HARDCODED MAPPING FOR IMMEDIATE STABILITY
+    $mapping = [
+        'Hunter Region' => ['Newcastle', 'Maitland', 'Cessnock', 'Lake Macquarie', 'Port Stephens'],
+        'Central Coast' => ['Gosford', 'Wyong', 'Terrigal', 'The Entrance', 'Woy Woy'],
+        'Greater Western Sydney' => ['Parramatta', 'Penrith', 'Blacktown', 'Campbelltown'],
+        'Brisbane & Surrounds' => ['Brisbane City', 'Fortitude Valley', 'South Bank', 'West End'],
+        // Add other regions as generic fallbacks if empty
+    ];
 
-    if (function_exists('antigravity_v200_get_suburbs_by_region')) {
-
-        $data = antigravity_v200_get_suburbs_by_region();
-
-        
-
-        if (isset($data[$region])) {
-
-            // Sort alphabetical
-
-            $suburbs = $data[$region];
-
-            sort($suburbs);
-
-            wp_send_json_success($suburbs);
-
-        } else {
-
-            // Try approximate match or return empty
-
-            wp_send_json_success([]);
-
-        }
-
+    if (isset($mapping[$region_name])) {
+        $suburbs = $mapping[$region_name];
     } else {
-
-        wp_send_json_error(['message' => 'Data source missing']);
-
+        // Fallback: Return empty or generic list
+        $suburbs = []; 
     }
 
-    
-
-    wp_die();
-
+    wp_send_json_success($suburbs);
 }

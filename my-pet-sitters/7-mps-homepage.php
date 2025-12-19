@@ -474,6 +474,7 @@ add_action('wp_head', function() {
         width: 100%;
         height: auto;
         display: block;
+        margin-bottom: 8px;
     }
     .mps-img-map {
         height: 450px;
@@ -506,6 +507,7 @@ add_action('wp_head', function() {
         height: 1px;
         background: var(--mps-teal);
         opacity: 0.3;
+        display: block;
     }
     .mps-paw-divider img {
         height: 28px;
@@ -547,6 +549,7 @@ add_action('wp_head', function() {
         align-items: flex-start;
         gap: 12px;
         font-weight: 700;
+        line-height: 1.2;
     }
     .mps-feature h3 span {
         color: var(--mps-teal);
@@ -655,6 +658,8 @@ add_action('wp_head', function() {
     .mps-benefits-ul li {
         margin-bottom: 10px;    
         font-size: 1.1rem;
+        position: relative;
+        padding-left: 28px;
     }
     .mps-benefits-ul li::before {
         content: '🐾';
@@ -842,47 +847,34 @@ function antigravity_v200_render_homepage($atts) {
             <h1>Find Trusted Pet Sitters & Dog Walkers Near You</h1>
             
             <!-- Search Form (Refactored for Split Dropdowns) -->
-            <form class="mps-search-box" action="/" method="get" onsubmit="return mpsSubmitSearch(this)">
+            <form class="mps-search-box" action="/" method="get" onsubmit="return mpsSearch(this)">
+                <select name="region" id="mps-region-select" onchange="mpsRegionChange()" required>
+                    <option value="">Select Region...</option>
+                    <optgroup label="NSW">
+                        <option value="Hunter Region">Hunter Region</option>
+                        <option value="Central Coast">Central Coast</option>
+                        <option value="Greater Western Sydney">Greater Western Sydney</option>
+                        <option value="Sydney">Sydney (City)</option>
+                    </optgroup>
+                    <optgroup label="QLD">
+                        <option value="Brisbane & Surrounds">Brisbane & Surrounds</option>
+                        <option value="Gold Coast">Gold Coast</option>
+                    </optgroup>
+                    </select>
                 
-                <!-- 1. REGION / CITY SELECT -->
-                <div style="flex: 1; position: relative;">
-                    <select name="region" id="mps-region-select" onchange="mpsRegionChange(this)" required style="width:100%;">
-                        <option value="">Select Region or Major City...</option>
-                        <?php foreach ($search_options as $group_label => $options): ?>
-                            <optgroup label="<?= esc_attr($group_label) ?>">
-                                <?php foreach ($options as $opt): 
-                                    // Determine if this is a region (has suburbs) or a city
-                                    // We assume keys in 'antigravity_v200_get_suburbs_by_region' are regions
-                                    $is_region = false;
-                                    if (function_exists('antigravity_v200_get_suburbs_by_region')) {
-                                        $subs = antigravity_v200_get_suburbs_by_region();
-                                        if (isset($subs[$opt])) $is_region = true;
-                                    }
-                                ?>
-                                    <option value="<?= esc_attr($opt) ?>" data-type="<?= $is_region ? 'region' : 'city' ?>"><?= esc_html($opt) ?></option>
-                                <?php endforeach; ?>
-                            </optgroup>
-                        <?php endforeach; ?>
+                <div id="mps-suburb-wrapper" style="display:none; flex:1; border-left:1px solid #eee;">
+                    <select name="suburb" id="mps-suburb-select" style="width:100%;">
+                        <option value="">Select Suburb (Optional)</option>
                     </select>
                 </div>
 
-                <!-- 2. SUBURB SELECT (Dynamic) -->
-                <div style="flex: 1; position: relative; border-left: 1px solid #eee;">
-                    <select name="suburb" id="mps-suburb-select" disabled style="width:100%; background-color: #f9f9f9;">
-                        <option value="">Select Suburb (Choose Region First)</option>
-                    </select>
-                </div>
-
-                <!-- 3. SERVICE SELECT -->
-                <div style="flex: 1; position: relative; border-left: 1px solid #eee;">
-                    <select name="service" id="mps-service-select" style="width:100%;">
-                        <option value="">All Services</option>
-                        <?php foreach ($services_map as $name => $slug): ?>
-                            <option value="<?= esc_attr($slug) ?>"><?= esc_html($name) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-
+                <select name="service" id="mps-service-select">
+                    <option value="">All Services</option>
+                    <?php foreach ($services_map as $name => $slug): ?>
+                        <option value="<?= esc_attr($slug) ?>"><?= esc_html($name) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                
                 <button type="submit" id="mps-hero-search-btn">Search</button>
             </form>
             
@@ -1095,7 +1087,10 @@ function antigravity_v200_render_homepage($atts) {
     <section class="mps-cities-section">
         <h2>Browse by City</h2>
         <div class="mps-cities-row">
-            <?php foreach ($cities as $city): ?>
+            <?php 
+            // V120: Fix undefined variable check
+            $cities_list = function_exists('antigravity_v200_cities_list') ? antigravity_v200_cities_list() : [];
+            foreach ($cities_list as $city): ?>
                 <a href="/<?= sanitize_title($city) ?>/" class="mps-city-pill"><?= esc_html($city) ?></a>
             <?php endforeach; ?>
         </div>
@@ -1130,97 +1125,70 @@ function antigravity_v200_render_homepage($atts) {
     </div><!-- .mps-home-wrapper -->
 
     <script>
-    // GLOBALS FOR AJAX
-    var mpsAjaxUrl = '<?= admin_url('admin-ajax.php') ?>';
-
-    // 1. REGION CHANGE HANDLER
-    function mpsRegionChange(select) {
-        var region = select.value;
+    function mpsRegionChange() {
+        var regionSelect = document.getElementById('mps-region-select');
+        var suburbWrapper = document.getElementById('mps-suburb-wrapper');
         var suburbSelect = document.getElementById('mps-suburb-select');
-        var selectedOpt = select.options[select.selectedIndex];
-        var type = selectedOpt.getAttribute('data-type');
+        var region = regionSelect.value;
 
-        // Reset Suburbs
-        suburbSelect.innerHTML = '<option value="">Select Suburb...</option>';
-        suburbSelect.disabled = true;
-        suburbSelect.style.backgroundColor = '#f9f9f9';
-
-        if (type === 'region' && region) {
-            // Fetch Suburbs
-            suburbSelect.innerHTML = '<option value="">Loading...</option>';
-            
-            fetch(mpsAjaxUrl + '?action=antigravity_get_suburbs&region=' + encodeURIComponent(region))
-            .then(res => res.json())
-            .then(data => {
-                if (data.success && data.data.length > 0) {
-                    var html = '<option value="">All Areas in ' + region + '</option>';
-                    data.data.forEach(sub => {
-                        html += '<option value="' + sub + '">' + sub + '</option>';
-                    });
-                    suburbSelect.innerHTML = html;
-                    suburbSelect.disabled = false;
-                    suburbSelect.style.backgroundColor = '#fff';
-                } else {
-                    suburbSelect.innerHTML = '<option value="">No specific suburbs found</option>';
-                    suburbSelect.disabled = true;
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                suburbSelect.innerHTML = '<option value="">Error loading suburbs</option>';
-            });
+        if (!region) {
+            suburbWrapper.style.display = 'none';
+            return;
         }
+
+        // Show loading or reset
+        suburbSelect.innerHTML = '<option>Loading...</option>';
+        suburbWrapper.style.display = 'block';
+
+        // AJAX Call
+        var formData = new FormData();
+        formData.append('action', 'antigravity_get_suburbs');
+        formData.append('region', region);
+
+        fetch('/wp-admin/admin-ajax.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            suburbSelect.innerHTML = '<option value="">All ' + region + '</option>';
+            if(data.success && data.data.length > 0) {
+                data.data.forEach(function(sub) {
+                    var opt = document.createElement('option');
+                    opt.value = sub;
+                    opt.text = sub;
+                    suburbSelect.appendChild(opt);
+                });
+            } else {
+                // No suburbs found, maybe hide or show generic
+            }
+        })
+        .catch(err => console.error(err));
     }
 
-    // 2. SEARCH SUBMIT HANDLER
-    function mpsSubmitSearch(form) {
-        var region = form.region.value;
-        var suburb = form.suburb.value;
-        var service = form.service.value;
+    function mpsSearch(form) {
+        var region = document.getElementById('mps-region-select').value;
+        var suburb = document.getElementById('mps-suburb-select').value;
+        var service = document.getElementById('mps-service-select').value;
 
-        if (!region && !suburb) {
-            alert('Please select a location');
+        // Logic: ?s=Suburb OR ?s=Region
+        var locationQuery = suburb ? suburb : region;
+
+        if (!locationQuery) {
+            alert('Please select a region');
             return false;
         }
 
-        // CONSTRUCT URL
-        // If suburb selected: /?s={Suburb}&post_type=sitter
-        // If only region: /?s={Region}&post_type=sitter
+        var searchUrl = '/?s=' + encodeURIComponent(locationQuery) + '&post_type=sitter';
         
-        var query = suburb ? suburb : region;
-        var url = '/?s=' + encodeURIComponent(query) + '&post_type=sitter';
+        // If you have specific service filters, append them
+        // Note: WordPress default search doesn't handle custom tax queries in URL easily without extra code,
+        // but the text search will work.
         
-        // Add service filter if present (usually passed as query param or part of URL structure if we had rewrites)
-        // For standard search, we append it if your search template handles it, or just use keyword match.
-        // Assuming your search loop filters by text, adding service name might help? 
-        // Or if you support /service/location permalinks.
-        
-        // Let's stick to standard WP search query for now, but maybe append service to query string
-        if (service) {
-            // Note: If you have a taxonomy for services, you should use &mps_service=slug etc. 
-            // But relying on text search for now:
-             url += '&service=' + encodeURIComponent(service);
-        }
-
-        window.location.href = url;
+        window.location.href = searchUrl;
         return false;
     }
-
-    // Scroll Reveal Observer
-    document.addEventListener('DOMContentLoaded', function() {
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('active');
-                }
-            });
-        }, {
-            threshold: 0.1
-        });
-
-        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-    });
-</script>
+    </script>
     
     <?php
     return ob_get_clean();
@@ -1228,5 +1196,3 @@ function antigravity_v200_render_homepage($atts) {
 // Register BOTH names (V120 Fix)
 add_shortcode('mps_homepage', 'antigravity_v200_render_homepage');
 add_shortcode('mps_landing_page', 'antigravity_v200_render_homepage');
-
-

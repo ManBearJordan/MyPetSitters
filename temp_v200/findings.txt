@@ -1,1 +1,0 @@
-/var/www/html/wp-content/mps-snippets/7-mps-homepage.php
