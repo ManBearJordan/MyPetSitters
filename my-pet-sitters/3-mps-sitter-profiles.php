@@ -42,11 +42,14 @@ add_filter('the_content', function($content) {
     $title = $clean($title_raw);
     
     $meta = antigravity_v200_get_sitter_meta($ID);
+    if (is_wp_error($meta) || !is_array($meta)) {
+        $meta = [];
+    }
     
-    // Clean meta fields
-    $meta['city'] = $clean($meta['city']);
-    $meta['suburb'] = $clean($meta['suburb']);
-    $meta['services'] = array_map($clean, $meta['services']);
+    // Clean meta fields (Safe Access)
+    $meta['city'] = $clean($meta['city'] ?? '');
+    $meta['suburb'] = $clean($meta['suburb'] ?? '');
+    $meta['services'] = isset($meta['services']) && is_array($meta['services']) ? array_map($clean, $meta['services']) : [];
     
     // V77 Hi-Res Image
     $img = '';
@@ -64,6 +67,9 @@ add_filter('the_content', function($content) {
     
     // Check if we have regional data
     $region_term = wp_get_post_terms($ID, 'mps_region', ['fields' => 'names']);
+    if (is_wp_error($region_term)) {
+        $region_term = [];
+    }
     $region_name = !empty($region_term) ? $region_term[0] : '';
     $state_code  = get_post_meta($ID, 'mps_state', true);
     
