@@ -47,7 +47,7 @@ function antigravity_v200_render_dashboard() {
     
     ob_start();
     ?>
-    <div class="mps-dashboard-wrapper">
+    <div class="mps-dashboard-wrapper" style="max-width:1200px;margin:0 auto;padding:20px;">
         <?php if ($is_viewing): ?>
             <div style="background:#fff3cd;color:#856404;padding:12px;border:1px solid #ffeeba;border-radius:6px;margin-bottom:20px;text-align:center;">
                 <strong>👁️ Admin Mode:</strong> You are viewing the dashboard as <u><?= esc_html($user->display_name) ?></u>. 

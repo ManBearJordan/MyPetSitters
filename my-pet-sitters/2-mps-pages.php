@@ -78,18 +78,15 @@ add_action('template_redirect', function() {
         $dummy->post_status = 'publish';
         $dummy->comment_status = 'closed';
         $dummy->ping_status = 'closed';
-        $dummy->post_name = 'rural-hub';
         $dummy->post_type = 'page';
         $dummy->filter = 'raw';
         
+        global $post; 
         $post = new WP_Post($dummy);
+        setup_postdata($post); // RESTORED for Rural Hub (Fixes 'post_type on null' warning)
+        
         $wp_query->post = $post;
         $wp_query->posts = [$post];
-        $wp_query->post_count = 1;
-        $wp_query->found_posts = 1;
-        $wp_query->max_num_pages = 1;
-        
-        global $post; // reinforce global
         
         include(plugin_dir_path(__FILE__) . 'tmpl-rural.php');
         exit;
@@ -497,7 +494,7 @@ function antigravity_v200_render_sitter_grid($city, $service = '', $limit = 12) 
                 <?php
                 // V104: PREFER REGION DISPLAY
                 $region_term = wp_get_post_terms($ID, 'mps_region', ['fields' => 'names']);
-                $region_name = !empty($region_term) ? $region_term[0] : '';
+                $region_name = (!empty($region_term) && !is_wp_error($region_term)) ? $region_term[0] : '';
                 
                 $location_display = $city_meta;
                 if ($suburb_meta) {
@@ -826,12 +823,13 @@ add_shortcode('mps_regions', function($atts) {
     // Group Locations by State
     $locations = antigravity_v200_get_valid_locations();
     $states_map = antigravity_v200_states_list();
+    $regions_by_state = antigravity_v200_get_valid_regions(); // Fetch the region data
     $groups = [];
     
     foreach ($states_map as $code => $name) {
         $groups[$code] = [
             'name' => $name,
-            'regions' => []
+            'regions' => $regions_by_state[$code] ?? [] // Populate regions
         ];
     }
     
@@ -854,6 +852,19 @@ add_shortcode('mps_regions', function($atts) {
                         </a>
                     </li>
                 </ul>
+
+                <?php if (!empty($data['regions'])): ?>
+                <h4 style="margin:0 0 12px;color:#666;font-size:0.95rem;text-transform:uppercase;letter-spacing:1px;">Regions</h4>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;">
+                    <?php foreach ($data['regions'] as $region): 
+                        $r_slug = sanitize_title($region);
+                    ?>
+                    <a href="/regions/<?= $r_slug ?>/" style="display:inline-block;padding:8px 16px;background:#eef6f6;color:#0d7377;text-decoration:none;border-radius:20px;font-size:0.9rem;font-weight:600;transition:all 0.2s;">
+                        <?= esc_html($region) ?>
+                    </a>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
                 
                 <?php
                 // V85: Dynamic State Examples

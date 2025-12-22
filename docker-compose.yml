@@ -14,7 +14,7 @@ services:
       WORDPRESS_DEBUG: 1
     volumes:
       - wordpress_data:/var/www/html
-      - ./refactored:/var/www/html/wp-content/plugins/mps-core-loader
+      - ./my-pet-sitters:/var/www/html/wp-content/plugins/my-pet-sitters
       - ./apache-wordpress.conf:/etc/apache2/conf-available/wordpress.conf
     depends_on:
       db:

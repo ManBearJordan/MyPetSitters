@@ -28,7 +28,16 @@
 
 if (!defined('ABSPATH')) exit;
 
-
+// AUTO-FLUSH REWRITE RULES (V217 Self-Healing)
+// AUTO-FLUSH REWRITE RULES (V220 Emergency Fix)
+// Running on 'admin_init' is more reliable for DB updates than frontend 'init'.
+add_action('admin_init', function() {
+    if (!get_option('mps_v220_emergency_flush')) {
+        flush_rewrite_rules();
+        update_option('mps_v220_emergency_flush', true);
+        error_log('MPS V220: Emergency Cache Flush Triggered.');
+    }
+});
 
 // Include Master Locations List (V76)
 
@@ -177,6 +186,27 @@ add_filter('wp_page_menu_args', function($args) {
 });
 
 
+
+add_filter('wp_nav_menu_objects', function($items, $args) {
+    if (is_user_logged_in()) {
+        foreach ($items as $key => $item) {
+            // 1. Change "Login" to "Account"
+            if (stripos($item->title, 'Login') !== false) {
+                $item->title = 'Account'; // Change label
+                $item->url = home_url('/account/'); // Change URL
+                $item->classes[] = 'mps-logged-in-account'; // Add class for styling
+            }
+
+            // 2. Hide "Join" / "Become a Sitter" for logged-in users
+            if (stripos($item->title, 'Join') !== false || stripos($item->title, 'Become a Sitter') !== false) {
+                unset($items[$key]);
+            }
+        }
+    } else {
+        // Optional: Ensure "Account" doesn't show if hardcoded (unlikely)
+    }
+    return $items;
+}, 10, 2);
 
 add_action('wp_head', function() {
 
@@ -1374,21 +1404,7 @@ function antigravity_v200_services_map() {
 
  */
 
-if (!function_exists('antigravity_v200_cities_list')) {
-
-function antigravity_v200_cities_list() {
-
-    if (function_exists('antigravity_v200_get_valid_locations')) {
-
-        return antigravity_v200_get_valid_locations();
-
-    }
-
-    return ['Brisbane', 'Sydney', 'Melbourne', 'Perth', 'Adelaide'];
-
-}
-
-}
+// Duplicate function definition removed (See line 1821)
 
 
 
@@ -1590,7 +1606,7 @@ add_action('init', function() {
 
         'supports'            => ['title', 'editor', 'excerpt', 'thumbnail', 'custom-fields', 'author'],
 
-        'capability_type'     => 'sitter',
+        'capability_type'     => 'post',
 
         'map_meta_cap'        => true,
 
@@ -1665,68 +1681,296 @@ add_action('init', function() {
 
 
 // ===========================================================================
+
 // AJAX HANDLER FOR SUBURBS (DYNAMIC DB QUERY)
+
 // ===========================================================================
+
 add_action('wp_ajax_antigravity_get_suburbs', 'antigravity_get_suburbs_handler');
+
 add_action('wp_ajax_nopriv_antigravity_get_suburbs', 'antigravity_get_suburbs_handler');
 
+
+
 function antigravity_get_suburbs_handler() {
+
     try {
+
         $region_name = isset($_POST['region']) ? sanitize_text_field($_POST['region']) : '';
+
         
+
         if (empty($region_name)) {
+
             wp_send_json_error(['message' => 'No region provided']);
+
         }
+
+
 
         // 1. Find all Sitter Posts in this Region
+
         // We query for posts that have the selected 'mps_region' term
+
         $args = [
+
             'post_type' => 'sitter',
+
             'post_status' => 'publish',
+
             'posts_per_page' => -1, // Get all to ensure we find all suburbs
+
             'tax_query' => [
+
                 [
+
                     'taxonomy' => 'mps_region',
+
                     'field'    => 'name',
+
                     'terms'    => $region_name,
+
                 ]
+
             ]
+
         ];
 
+
+
         $query = new WP_Query($args);
+
         $found_suburbs = [];
 
+
+
         // 2. Extract Suburbs (mps_city) from those Sitters
+
         if ($query->have_posts()) {
+
             foreach ($query->posts as $post) {
+
                 // Try to get the suburb from the 'mps_city' taxonomy first (preferred)
+
                 $terms = get_the_terms($post->ID, 'mps_city');
+
                 if ($terms && !is_wp_error($terms)) {
+
                     foreach ($terms as $term) {
+
                         $found_suburbs[] = $term->name;
+
                     }
+
                 }
+
                 
+
                 // Fallback: Check custom field 'mps_suburb' if taxonomy is empty
+
                 $meta_suburb = get_post_meta($post->ID, 'mps_suburb', true);
+
                 if ($meta_suburb) {
+
                     $found_suburbs[] = trim($meta_suburb);
+
                 }
+
             }
+
         }
 
+
+
         // 3. Clean up list
+
         $found_suburbs = array_unique($found_suburbs);
+
         sort($found_suburbs);
 
+
+
         // 4. Return Data
+
         // If no specific suburbs found (e.g., region has sitters but no suburb data),
+
         // return empty so frontend handles it gracefully.
+
         wp_send_json_success($found_suburbs);
+
         
+
     } catch (Exception $e) {
+
         // Log error and return strict failure
+
         error_log('MPS AJAX Error: ' . $e->getMessage());
+
         wp_send_json_error(['message' => 'Internal Server Error']);
+
     }
+
 }
+
+
+
+/**
+
+ * Get list of supported cities
+
+ * RESTORED V208
+
+ */
+
+if (!function_exists('antigravity_v200_cities_list')) {
+
+function antigravity_v200_cities_list() {
+
+    return ['Brisbane', 'Sydney', 'Melbourne', 'Perth', 'Adelaide'];
+
+}
+
+}
+
+
+
+
+
+/**
+
+ * Get list of Australian States
+
+ * RESTORED V210 (Fixes Regions Page Crash)
+
+ */
+
+if (!function_exists('antigravity_v200_states_list')) {
+
+function antigravity_v200_states_list() {
+
+    return [
+
+        'NSW' => 'New South Wales',
+
+        'VIC' => 'Victoria',
+
+        'QLD' => 'Queensland',
+
+        'WA'  => 'Western Australia',
+
+        'SA'  => 'South Australia',
+
+        'TAS' => 'Tasmania',
+
+        'ACT' => 'Australian Capital Territory',
+
+        'NT'  => 'Northern Territory'
+
+    ];
+
+}
+
+}
+
+
+
+/**
+
+ * Get Suburbs mapped by Region
+
+ * RESTORED V211 (Fixes Edit Profile Tab)
+
+ */
+
+if (!function_exists('antigravity_v200_get_suburbs_by_region')) {
+
+function antigravity_v200_get_suburbs_by_region() {
+
+    return [
+
+        // NSW
+
+        'Hunter Region' => ['Newcastle', 'Maitland', 'Cessnock', 'Singleton', 'Muswellbrook', 'Port Stephens', 'Lake Macquarie', 'Kurri Kurri'],
+
+        'Greater Western Sydney' => ['Parramatta', 'Penrith', 'Blacktown', 'Campbelltown', 'Liverpool', 'Fairfield', 'Richmond', 'Windsor', 'Camden'],
+
+        'Central Coast' => ['Gosford', 'Wyong', 'Terrigal', 'The Entrance', 'Woy Woy', 'Avoca Beach', 'Erina'],
+
+        'Mid North Coast' => ['Port Macquarie', 'Coffs Harbour', 'Taree', 'Forster', 'Tuncurry', 'Kempsey', 'Wauchope'],
+
+        'Northern Rivers' => ['Lismore', 'Ballina', 'Byron Bay', 'Tweed Heads', 'Casino', 'Kyogle', 'Grafton', 'Yamba'],
+
+        'New England / North West' => ['Tamworth', 'Armidale', 'Moree', 'Gunnedah', 'Narrabri', 'Inverell', 'Glen Innes'],
+
+        'Central West' => ['Orange', 'Bathurst', 'Dubbo', 'Mudgee', 'Parkes', 'Forbes', 'Cowra', 'Lithgow'],
+
+        'Southern Highlands' => ['Bowral', 'Mittagong', 'Moss Vale', 'Goulburn'],
+
+        'South Coast' => ['Wollongong', 'Nowra', 'Bomaderry', 'Ulladulla', 'Batemans Bay', 'Moruya', 'Bega', 'Merimbula'],
+
+        'Riverina' => ['Wagga Wagga', 'Griffith', 'Albury', 'Leeton', 'Cootamundra', 'Narrandera', 'Deniliquin'],
+
+        'Illawarra' => ['Wollongong', 'Shellharbour', 'Kiama', 'Dapto', 'Albion Park'],
+
+        'Snowy Mountains' => ['Cooma', 'Jindabyne', 'Thredbo', 'Perisher Valley'],
+
+        
+
+        // QLD
+
+        'Brisbane & Surrounds' => ['Brisbane', 'Ipswich', 'Logan City', 'Redcliffe', 'Cleveland', 'Strathpine', 'Caboolture'],
+
+        'South East Queensland' => ['Gold Coast', 'Sunshine Coast', 'Toowoomba', 'Gatton', 'Beaudesert'],
+
+        'Gold Coast' => ['Surfers Paradise', 'Southport', 'Burleigh Heads', 'Coolangatta', 'Robina', 'Nerang', 'Coomera'],
+
+        'Sunshine Coast' => ['Maroochydore', 'Caloundra', 'Noosa Heads', 'Nambour', 'Maleny', 'Gympie'],
+
+        'North Queensland' => ['Townsville', 'Ayr', 'Charters Towers', 'Ingham', 'Bowen'],
+
+        'Far North Queensland' => ['Cairns', 'Port Douglas', 'Atherton', 'Mareeba', 'Innisfail'],
+
+        'Central Queensland' => ['Rockhampton', 'Gladstone', 'Yeppoon', 'Emerald', 'Biloela'],
+
+        'Wide Bay-Burnett' => ['Bundaberg', 'Hervey Bay', 'Maryborough', 'Kingaroy'],
+
+        'Darling Downs' => ['Toowoomba', 'Warwick', 'Dalby', 'Stanthorpe', 'Goondiwindi'],
+
+        
+
+        // VIC
+
+        'Greater Melbourne' => ['Melbourne', 'Geelong', 'Frankston', 'Dandenong', 'Pakenham', 'Sunbury', 'Werribee', 'Melton'],
+
+        'Gippsland' => ['Traralgon', 'Moe', 'Morwell', 'Sale', 'Bairnsdale', 'Warragul', 'Leongatha', 'Wonthaggi'],
+
+        'Barwon South West' => ['Warrnambool', 'Colac', 'Portland', 'Hamilton', 'Torquay', 'Lorne'],
+
+        'Hume' => ['Shepparton', 'Wangaratta', 'Wodonga', 'Benalla', 'Seymour', 'Echuca'],
+
+        'Loddon Mallee' => ['Bendigo', 'Mildura', 'Swan Hill', 'Castlemaine', 'Maryborough', 'Kyneton'],
+
+        'Central Victoria' => ['Ballarat', 'Ararat', 'Stawell', 'Daylesford'],
+
+        
+
+        // WA, SA, TAS placeholders for brevity
+
+        'Perth & Peel' => ['Perth', 'Fremantle', 'Joondalup', 'Rockingham', 'Mandurah', 'Armadale'],
+
+        'South West' => ['Bunbury', 'Busselton', 'Margaret River', 'Collie', 'Manjimup'],
+
+        'Adelaide & Surrounds' => ['Adelaide', 'Gawler', 'Mount Barker', 'Salisbury', 'Glenelg'],
+
+        'Hobart & Surrounds' => ['Hobart', 'Glenorchy', 'Kingston', 'Sorell', 'New Norfolk'],
+
+        'Canberra' => ['Canberra', 'Queanbeyan', 'Gungahlin', 'Tuggeranong', 'Belconnen', 'Woden'],
+
+        'Darwin & Surrounds' => ['Darwin', 'Palmerston', 'Casuarina']
+
+    ];
+
+}
+
+}
+

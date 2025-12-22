@@ -1,0 +1,139 @@
+Scanning Current: /var/www/html/wp-content/plugins/my-pet-sitters
+Scanning V200:    /var/www/html/v200_ref/my-pet-sitters
+Found 97 functions in Current.
+Found 0 functions in V200.
+
+--- MISSING FUNCTIONS (Need Restoration) ---
+NONE. All V200 functions are present.
+
+--- EXTRA FUNCTIONS (Extensions) ---
++ antigravity_v200_get_valid_locations
++ antigravity_v200_is_valid_suburb
++ exists
++ antigravity_v200_get_valid_regions
++ antigravity_v200_get_sitter_thumbnail
++ antigravity_v200_get_lowest_price
++ antigravity_v200_get_sitter_post
++ antigravity_v200_services_map
++ antigravity_v200_normalise_services_labels
++ antigravity_v200_slugify
++ antigravity_v200_service_slug_to_label
++ antigravity_v200_get_sitter_meta
++ antigravity_get_suburbs_handler
++ antigravity_v200_states_list
++ antigravity_v200_cities_list
++ antigravity_v200_create_booking
++ antigravity_v200_render_booking_form_shortcode
++ antigravity_v200_handle_booking_submission
++ antigravity_v200_handle_booking_update
++ antigravity_v200_notify_booking_update
++ antigravity_v200_get_name
++ antigravity_v200_get_unavailable_dates
++ antigravity_v200_toggle_date_availability
++ antigravity_v200_ajax_toggle_date
++ antigravity_v200_calendar_shortcode
++ antigravity_v200_render_pets_form
++ antigravity_v200_save_pet
++ antigravity_v200_handle_save_pet
++ antigravity_v200_get_user_pets
++ antigravity_v200_handle_favorite_action
++ antigravity_v200_is_favorite
++ antigravity_v200_get_user_favorites
++ antigravity_v200_favorite_btn_shortcode
++ antigravity_v200_render_sitter_landing
++ antigravity_v200_add_admin_menu
++ antigravity_v200_handle_admin_actions
++ antigravity_v200_render_admin_home
++ antigravity_v200_render_admin_bookings
++ antigravity_v200_render_admin_messages
++ antigravity_v200_render_admin_add_user
++ antigravity_v200_render_admin_communication
++ antigravity_v200_get_email_template
++ antigravity_v200_change_password_shortcode
++ antigravity_v200_handle_change_password
++ antigravity_v200_lost_password_shortcode
++ antigravity_v200_handle_lost_password
++ antigravity_v200_reset_password_shortcode
++ antigravity_v200_handle_reset_password
++ antigravity_v200_edit_profile_shortcode
++ updateRegions
++ updateSuburbs
++ antigravity_v200_handle_profile_save
++ antigravity_v200_image_upload_handler
++ antigravity_v200_render_page
++ antigravity_v200_render_cities
++ antigravity_v200_render_services
++ antigravity_v200_render_sitter_grid
++ antigravity_v200_render_faqs
++ antigravity_v200_can_attempt_login
++ antigravity_v200_record_login_attempt
++ antigravity_v200_render_register
++ mpsShowTab
++ antigravity_v200_render_logout
++ antigravity_v200_link_sitter_to_user
++ antigravity_v200_render_dashboard
++ antigravity_v200_render_pets_tab
++ antigravity_v200_render_bookings_tab
++ antigravity_v200_count_unread_messages
++ antigravity_v200_count_pending_bookings
++ antigravity_v200_sitter_meta_box
++ antigravity_v200_user_listing_columns
++ antigravity_v200_custom_user_columns
++ antigravity_v200_user_sortable_columns_manage
++ antigravity_v200_make_user_table_sortable
++ antigravity_v200_show_extra_profile_fields
++ antigravity_v200_save_extra_profile_fields
++ antigravity_v200_render_homepage
++ mpsSearch
++ filterCities
++ antigravity_v200_notify_message
++ antigravity_v200_send_message
++ antigravity_v200_handle_msg_send
++ antigravity_v200_inbox_shortcode
++ antigravity_v200_contact_button_shortcode
++ antigravity_v200_get_sitter_user_id
++ antigravity_v200_get_unread_count
++ antigravity_v200_mail_from_email
++ antigravity_v200_handle_review_submission
++ antigravity_v200_review_form_shortcode
++ antigravity_v200_get_sitter_rating
++ antigravity_v200_get_rating_html
++ antigravity_v200_review_callback
++ antigravity_v200_get_master_suburbs_list
++ antigravity_v200_get_search_options
++ antigravity_v200_get_suburbs_by_region
++ antigravity_v200_check_pages
++ antigravity_v200_installer
+
+--- JUNK CODE SCAN ---
+JUNK? [error_log] in 1-mps-core.php:1715
+JUNK? [die(] in 10-mps-bookings.php:100
+JUNK? [die(] in 10-mps-bookings.php:124
+JUNK? [die(] in 10-mps-bookings.php:126
+JUNK? [die(] in 10-mps-bookings.php:134
+JUNK? [die(] in 11-mps-calendar.php:39
+JUNK? [die(] in 12-mps-pets.php:179
+JUNK? [die(] in 12-mps-pets.php:191
+JUNK? [die(] in 13-mps-favorites.php:17
+JUNK? [die(] in 15-mps-account.php:11
+JUNK? [die(] in 15-mps-account.php:20
+JUNK? [die(] in 15-mps-account.php:62
+JUNK? [die(] in 15-mps-account.php:92
+JUNK? [die(] in 15-mps-account.php:167
+JUNK? [die(] in 16-mps-admin-dashboard.php:58
+JUNK? [die(] in 16-mps-admin-dashboard.php:62
+JUNK? [die(] in 16-mps-admin-dashboard.php:98
+JUNK? [die(] in 18-mps-security.php:55
+JUNK? [die(] in 18-mps-security.php:65
+JUNK? [die(] in 18-mps-security.php:69
+JUNK? [die(] in 18-mps-security.php:132
+JUNK? [die(] in 18-mps-security.php:203
+JUNK? [die(] in 18-mps-security.php:206
+JUNK? [die(] in 19-mps-edit-profile.php:421
+JUNK? [die(] in 8-mps-messaging.php:80
+JUNK? [die(] in 9-mps-reviews.php:18
+JUNK? [die(] in 9-mps-reviews.php:29
+JUNK? [die(] in 9-mps-reviews.php:33
+JUNK? [die(] in 9-mps-reviews.php:37
+JUNK? [die(] in 9-mps-reviews.php:59
+JUNK? [error_log] in tmpl-search.php:66

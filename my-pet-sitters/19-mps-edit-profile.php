@@ -13,9 +13,10 @@
 if (!defined('ABSPATH')) exit;
 
 // [mps_edit_profile] SHORTCODE
-// [mps_edit_profile] SHORTCODE
 add_shortcode('mps_edit_profile', 'antigravity_v200_edit_profile_shortcode');
 function antigravity_v200_edit_profile_shortcode($atts) {
+    // NUCLEAR ERROR HANDLING (V214)
+    try {
     if (!is_user_logged_in()) {
         return '<p>Please <a href="/login/">log in</a> to edit your profile.</p>';
     }
@@ -46,21 +47,20 @@ function antigravity_v200_edit_profile_shortcode($atts) {
     
     if ($sitter_post) {
         $meta = antigravity_v200_get_sitter_meta($sitter_post->ID);
-        if (is_wp_error($meta)) $meta = [];
-
-        $values['phone'] = $meta['phone'] ?? '';
-        $values['city'] = $meta['city'] ?? '';
-        $values['suburb'] = $meta['suburb'] ?? '';
-        $values['state'] = $meta['state'] ?? '';
-        $values['location_type'] = !empty($meta['location_type']) ? $meta['location_type'] : 'Urban';
-        $values['radius'] = $meta['radius'] ?? '';
+        $values['phone'] = $meta['phone'];
+        $values['city'] = $meta['city'];
+        $values['suburb'] = $meta['suburb'];
+        $values['state'] = $meta['state'];
+        $values['location_type'] = $meta['location_type'] ?: 'Urban';
+        $values['radius'] = $meta['radius'];
         
         // Get Region Term
         $regions = wp_get_post_terms($sitter_post->ID, 'mps_region', ['fields' => 'names']);
-        $values['region'] = !empty($regions) && !is_wp_error($regions) ? $regions[0] : '';
+        if (is_wp_error($regions)) $regions = []; // Safety fix V215
+        $values['region'] = !empty($regions) ? $regions[0] : '';
 
         $values['bio'] = $sitter_post->post_content;
-        $values['services'] = $meta['services'] ?? [];
+        $values['services'] = $meta['services'];
         $values['skills'] = get_post_meta($sitter_post->ID, 'mps_skills', true) ?: [];
         $values['accepted_pets'] = get_post_meta($sitter_post->ID, 'mps_accepted_pets', true) ?: [];
         $values['show_phone'] = get_post_meta($sitter_post->ID, 'mps_show_phone', true);
@@ -151,7 +151,7 @@ function antigravity_v200_edit_profile_shortcode($atts) {
         try {
             regionsData = <?= json_encode($structured_regions) ?>;
             suburbsData = <?= json_encode(array_merge(
-                antigravity_v200_get_suburbs_by_region(), 
+                (function_exists('antigravity_v200_get_suburbs_by_region') ? antigravity_v200_get_suburbs_by_region() : []), 
                 // Fallback for unmapped regions?
                 [] 
             )) ?>;
@@ -159,15 +159,22 @@ function antigravity_v200_edit_profile_shortcode($atts) {
 
         const stateSelect = document.querySelector('select[name="state"]');
         const regionSelect = document.querySelector('select[name="region"]');
-        const cityInput = document.querySelector('input[name="city"]');
-        const cityDatalist = document.getElementById('antigravity_v200_cities_list');
+        // V219: Repointed to 'suburb' input since 'city' is now a dropdown
+        const suburbInput = document.querySelector('input[name="suburb"]');
         
         if (!stateSelect || !regionSelect) return;
         
+        // Create datalist if it doesn't exist (it was removed in PHP)
+        let suburbDatalist = document.getElementById('mps-suburb-list');
+        if (!suburbDatalist && suburbInput) {
+            suburbDatalist = document.createElement('datalist');
+            suburbDatalist.id = 'mps-suburb-list';
+            document.body.appendChild(suburbDatalist);
+            suburbInput.setAttribute('list', 'mps-suburb-list');
+        }
+
         // Store initial values
         const initialRegion = "<?= esc_js($values['region']) ?>";
-        // Convert 'City' to title case for cleaner matching
-        const initialCity = "<?= esc_js($values['city']) ?>";
         
         function updateRegions() {
             const state = stateSelect.value;
@@ -190,50 +197,47 @@ function antigravity_v200_edit_profile_shortcode($atts) {
                 regionSelect.appendChild(opt);
             });
             
-            // Trigger suburb update when region changes or is repopulated
+            // Trigger suburb update when region changes
             updateSuburbs();
         }
 
         function updateSuburbs() {
+            if (!suburbInput || !suburbDatalist) return;
+
             const region = regionSelect.value;
             
             // Clear current options
-            cityDatalist.innerHTML = '';
+            suburbDatalist.innerHTML = '';
             
             let suburbs = [];
             if (region && suburbsData[region]) {
                 suburbs = suburbsData[region];
             } else {
-                // If no region selected (or no mapped suburbs), maybe show ALL or NOTHING?
-                // User wants "suburbs in their region".
-                // If nothing selected, we instruct them.
                 return;
             }
             
             suburbs.sort().forEach(s => {
                 const opt = document.createElement('option');
                 opt.value = s;
-                cityDatalist.appendChild(opt);
+                suburbDatalist.appendChild(opt);
             });
             
             // Helpful placeholder
             if (suburbs.length > 0) {
-                 cityInput.placeholder = "Select suburb in " + region + "...";
+                 suburbInput.placeholder = "Select suburb in " + region + "...";
             } else {
-                 cityInput.placeholder = "Type your suburb...";
+                 suburbInput.placeholder = "Type your suburb...";
             }
         }
         
         stateSelect.addEventListener('change', function() {
             updateRegions();
             regionSelect.value = ""; 
-            updateSuburbs(); // Clear suburbs if state changes
+            updateSuburbs(); 
         });
         
         regionSelect.addEventListener('change', function() {
             updateSuburbs();
-            // Optional: Clear city input if it doesn't match new region? 
-            // Better to leave it for user to fix if needed.
         });
         
         // Initial Load
@@ -241,7 +245,7 @@ function antigravity_v200_edit_profile_shortcode($atts) {
             updateRegions();
             if (initialRegion) {
                 regionSelect.value = initialRegion;
-                updateSuburbs(); // Populate suburbs for saved region
+                updateSuburbs(); 
             }
         } else {
             regionSelect.disabled = true;
@@ -328,12 +332,19 @@ function antigravity_v200_edit_profile_shortcode($atts) {
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
             <div>
-                <label><strong>City / Town *</strong></label><br>
-                <input type="text" name="city" value="<?= esc_attr($values['city']) ?>" required list="antigravity_v200_cities_list" placeholder="Start typing..." autocomplete="off" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">
-                <datalist id="antigravity_v200_cities_list">
-                    <!-- Populated by JS based on Region -->
-                </datalist>
-                <p style="font-size:0.85em;color:#666;margin:4px 0 0;">(Select from compiled list or type your own if missing)</p>
+                <label><strong>Closest Major City *</strong></label><br>
+                <select name="city" required style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">
+                    <option value="">-- Select Closest City --</option>
+                    <?php 
+                    $city_options = function_exists('antigravity_v200_cities_list') ? antigravity_v200_cities_list() : ['Brisbane', 'Sydney', 'Melbourne', 'Perth', 'Adelaide', 'Canberra', 'Hobart', 'Darwin'];
+                    foreach ($city_options as $c) {
+                        $selected = ($values['city'] === $c) ? 'selected' : '';
+                        echo '<option value="' . esc_attr($c) . '" ' . $selected . '>' . esc_html($c) . '</option>';
+                    }
+                    ?>
+                    <option value="Not Listed" <?php selected($values['city'], 'Not Listed'); ?>>Not Listed / Other</option>
+                </select>
+                <p style="font-size:0.85em;color:#666;margin:4px 0 0;">(Choose "Not Listed" if you are in a regional area not near a major city)</p>
             </div>
             <div>
                 <label><strong>Suburb</strong></label><br>
@@ -413,6 +424,16 @@ function antigravity_v200_edit_profile_shortcode($atts) {
     </form>
     <?php
     return ob_get_clean();
+    
+    } catch (Throwable $e) {
+        ob_end_clean();
+        return '<div style="background:#f8d7da;border:1px solid #f5c6cb;color:#721c24;padding:20px;border-radius:8px;">' .
+               '<h3>⚠️ Profile Error</h3>' .
+               '<p>We encountered an issue loading your profile form:</p>' .
+               '<pre style="background:#fff;padding:10px;border:1px solid #ccc;overflow:auto;">' . esc_html($e->getMessage()) . ' in ' . basename($e->getFile()) . ':' . $e->getLine() . '</pre>' .
+               '<p>Please contact support with this message.</p>' .
+               '</div>';
+    }
 }
 
 // HANDLE FORM SUBMISSION
@@ -465,7 +486,7 @@ function antigravity_v200_handle_profile_save() {
     }
 
     // V103: INLINED VALIDATION DATA
-    $region_input = isset($_POST['region']) ? sanitize_text_field($_POST['region']) : '';
+    $region_input = sanitize_text_field($_POST['region']);
     if ($region_input) {
         $structured_regions = [
             'NSW' => [
@@ -602,7 +623,7 @@ function antigravity_v200_handle_profile_save() {
 
         
         // Region Terms (V75)
-        $region = isset($_POST['region']) ? sanitize_text_field($_POST['region']) : '';
+        $region = sanitize_text_field($_POST['region']);
         if ($region) {
              $term_check = term_exists($region, 'mps_region');
              $term_id = 0;
@@ -655,6 +676,7 @@ function antigravity_v200_handle_profile_save() {
 
 
 // Helper: Handle Image Upload
+if (!function_exists('antigravity_v200_image_upload_handler')) {
 function antigravity_v200_image_upload_handler($file_key) {
     // This function would contain the logic for handling image uploads,
     // similar to what was previously in the main handler.
@@ -663,7 +685,4 @@ function antigravity_v200_image_upload_handler($file_key) {
     // Assuming it would handle 'photo' from $_FILES.
     return media_handle_upload($file_key, 0); // Post ID 0 for now, would be passed or determined within the function
 }
-
-
-
-
+}

@@ -25,6 +25,66 @@ function antigravity_v200_record_login_attempt($email, $success = false) {
 
 
 
+
+// ===========================================================================
+// VIRTUAL AUTH PAGES (Join, Login, etc.)
+// ===========================================================================
+
+add_action('init', function() {
+    add_rewrite_rule('^join/?$', 'index.php?mps_auth_page=join', 'top');
+    add_rewrite_rule('^login/?$', 'index.php?mps_auth_page=login', 'top');
+});
+
+add_filter('query_vars', function($vars) {
+    $vars[] = 'mps_auth_page';
+    return $vars;
+});
+
+add_action('template_redirect', function() {
+    $page = get_query_var('mps_auth_page');
+    if (!$page) return;
+    
+    // Prevent "Hello World" / 404
+    global $wp_query;
+    $wp_query->is_home = false;
+    $wp_query->is_404 = false;
+    $wp_query->is_page = true;
+    
+    // Create Dummy Post
+    $dummy = new stdClass();
+    $dummy->ID = -99;
+    $dummy->post_author = 1;
+    $dummy->post_date = current_time('mysql');
+    $dummy->post_date_gmt = current_time('mysql', 1);
+    $dummy->post_status = 'publish';
+    $dummy->comment_status = 'closed';
+    $dummy->ping_status = 'closed';
+    $dummy->post_type = 'page';
+    $dummy->filter = 'raw';
+    
+    if ($page === 'join') {
+        $dummy->post_title = 'Join My Pet Sitters';
+        $dummy->post_content = '[mps_sitter_submit]'; // Use our new wrapper
+        $dummy->post_name = 'join';
+    } elseif ($page === 'login') {
+        $dummy->post_title = 'Log In';
+        $dummy->post_content = '[mps_login]';
+        $dummy->post_name = 'login';
+    } else {
+        return; 
+    } 
+
+    
+    // SIMPLIFIED FIX: Bypass theme complications for now to PROVE it works.
+    get_header(); // Validate if header causes it? 
+    echo '<div id="primary" class="content-area"><main id="main" class="site-main" role="main">';
+    echo do_shortcode($dummy->post_content);
+    echo '</main></div>';
+    get_footer();
+    exit;
+});
+
+// Login Shortcode
 add_shortcode('mps_login', function($atts) {
     $a = shortcode_atts([
         'redirect' => '/account/',
@@ -136,25 +196,34 @@ add_shortcode('mps_login', function($atts) {
     return ob_get_clean();
 });
 
+// Register BOTH names (V120 Fix)
+add_shortcode('mps_register', 'antigravity_v200_render_register');
+add_shortcode('mps_registration', 'antigravity_v200_render_register');
 
 
 // Converted to named function (V120 Fix)
 function antigravity_v200_render_register($atts) {
     $a = shortcode_atts([
-        'role'     => '',  // Empty = show both tabs, 'pro' = sitters only, 'subscriber' = owners only
-        'redirect' => '/account/',
+        'role'        => '',       // Empty = show both tabs, 'pro' = sitters only, 'subscriber' = owners only
+        'redirect'    => '/account/',
+        'default_tab' => 'owner',  // Which tab to show first if both are visible
     ], $atts, 'mps_register');
+    
+    // FIX (Merged from fix-tabs.php): Force both tabs if Sitter is default
+    if ($a['default_tab'] === 'sitter') {
+        $a['role'] = '';
+    }
     
     // Already logged in
     if (is_user_logged_in()) {
         $dest = esc_url(home_url($a['redirect']));
-        return '<div class="mps-notice mps-notice-info" style="padding:16px;background:#e8f4f8;border-radius:8px;">
+        return '<div class="mps-notice mps-notice-info" style="padding:16px;background:#e8f4f8;border-radius:8px;margin-bottom:16px;">
             <p>You\'re already logged in. <a href="' . $dest . '">Go to your account</a>.</p>
         </div>';
     }
     
     $errors = [];
-    $active_tab = $_POST['mps_tab'] ?? 'owner';
+    $active_tab = $_POST['mps_tab'] ?? $a['default_tab']; // Use default tab if no post
     $values = ['name' => '', 'email' => ''];
     
     // Process form submission
@@ -352,9 +421,11 @@ function antigravity_v200_render_register($atts) {
     <?php
     return ob_get_clean();
 }
-// Register BOTH names (V120 Fix)
-add_shortcode('mps_register', 'antigravity_v200_render_register');
-add_shortcode('mps_registration', 'antigravity_v200_render_register');
+
+
+
+// Converted to named function (V120 Fix)
+
 
 
 add_shortcode('mps_logout', 'antigravity_v200_render_logout');
@@ -410,3 +481,41 @@ add_action('user_register', 'antigravity_v200_link_sitter_to_user', 10, 1);
 add_action('wp_login', function($user_login, $user) {
     antigravity_v200_link_sitter_to_user($user);
 }, 10, 2);
+
+
+/**
+ * [mps_sitter_submit] Shortcode
+ * Restores the "List Your Services" flow
+ */
+add_shortcode('mps_sitter_submit', function($atts) {
+    // 1. Logged In? Redirect to Edit Profile
+    if (is_user_logged_in()) {
+        // Optional: Check if they are already a sitter?
+        // For now, just send them to the profile editor.
+        // If they don't have a profile, edit-profile should handle creation.
+        echo '<script>window.location.href="/edit-profile/";</script>';
+        return '<p>Redirecting to your profile...</p>';
+    }
+
+    // 2. Guest? Show Sitter Registration Form
+    // We reuse the existing register function but force the "Sitter" role/tab
+    ob_start();
+    ?>
+    <section class="mps-wrap" style="max-width:500px;margin:0 auto;padding:40px 0;">
+        <div style="text-align:center;margin-bottom:30px;">
+            <h1 style="font-size:2rem;margin-bottom:12px;">Create your Sitter Profile</h1>
+            <p style="color:#666;">Join the community, set your rates, and start earning.</p>
+        </div>
+        
+        <?php
+        // Force 'pro' role (Sitter) logic
+        echo antigravity_v200_render_register([
+            'role' => '', // Show BOTH tabs per user request
+            'default_tab' => 'sitter', // But default to Sitter
+            'redirect' => '/edit-profile/'
+        ]); 
+        ?>
+    </section>
+    <?php
+    return ob_get_clean();
+});
