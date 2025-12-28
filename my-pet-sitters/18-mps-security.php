@@ -114,6 +114,8 @@ function antigravity_v200_lost_password_shortcode() {
     return ob_get_clean();
 }
 
+// FIX V221: Add nopriv hook so guests can use this!
+add_action('admin_post_nopriv_mps_process_lost_password', 'antigravity_v200_handle_lost_password');
 add_action('admin_post_mps_process_lost_password', 'antigravity_v200_handle_lost_password');
 function antigravity_v200_handle_lost_password() {
     check_admin_referer('mps_lost_pass');
@@ -191,6 +193,8 @@ function antigravity_v200_reset_password_shortcode() {
     return ob_get_clean();
 }
 
+// FIX V221: Add nopriv hook so guests can use this!
+add_action('admin_post_nopriv_mps_process_reset_password', 'antigravity_v200_handle_reset_password');
 add_action('admin_post_mps_process_reset_password', 'antigravity_v200_handle_reset_password');
 function antigravity_v200_handle_reset_password() {
     check_admin_referer('mps_do_reset');

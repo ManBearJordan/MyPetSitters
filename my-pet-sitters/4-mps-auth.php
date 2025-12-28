@@ -44,6 +44,9 @@ add_action('template_redirect', function() {
     $page = get_query_var('mps_auth_page');
     if (!$page) return;
     
+    // FIX V221: Prevent caching of virtual pages (fixes Stale Nonce / Security Check Failed)
+    nocache_headers();
+    
     // Prevent "Hello World" / 404
     global $wp_query;
     $wp_query->is_home = false;
