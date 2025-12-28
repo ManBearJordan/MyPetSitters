@@ -1,4 +1,5 @@
 if (!defined('ABSPATH')) exit;
+// V223 Verified: Class Library Only. No Auto-Run.
 
 if ( ! class_exists( 'MPS_Core' ) ) {
 
