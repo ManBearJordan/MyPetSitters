@@ -1,3 +1,4 @@
+<?php
 if (!defined('ABSPATH')) exit;
 // V223 Verified: Class Library Only. No Auto-Run.
 
