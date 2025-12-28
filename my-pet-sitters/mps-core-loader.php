@@ -41,6 +41,13 @@ foreach ($core_files as $file) {
     require_once plugin_dir_path(__FILE__) . $file;
 }
 
+// FIX V222: Safe Class Instantiation to prevent 'Split Brain'
+add_action( 'plugins_loaded', function() {
+    if ( class_exists( 'MPS_Core' ) ) {
+        new MPS_Core();
+    }
+});
+
 // REGISTER ACTIVATION HOOK
 register_activation_hook(__FILE__, 'antigravity_v200_installer');
 

@@ -1,212 +1,98 @@
-<?php
-
-/**
-
- * MPS CORE - Constants, Helpers, CPT & Taxonomies
-
- * 
-
- * Priority: CRITICAL - Must be active for all other MPS snippets to work
-
- * 
-
- * This snippet provides:
-
- * - Configuration constants
-
- * - Helper functions used throughout
-
- * - Sitter custom post type registration
-
- * - City and Service taxonomy registration
-
- * - Pro (sitter) role creation
-
- */
-
-
-
 if (!defined('ABSPATH')) exit;
 
-// AUTO-FLUSH REWRITE RULES (V217 Self-Healing)
-// AUTO-FLUSH REWRITE RULES (V220 Emergency Fix)
-// Running on 'admin_init' is more reliable for DB updates than frontend 'init'.
-add_action('admin_init', function() {
-    if (!get_option('mps_v220_emergency_flush')) {
-        flush_rewrite_rules();
-        update_option('mps_v220_emergency_flush', true);
-        error_log('MPS V220: Emergency Cache Flush Triggered.');
+if ( ! class_exists( 'MPS_Core' ) ) {
+
+    class MPS_Core {
+
+        public function __construct() {
+            $this->init_hooks();
+        }
+
+        private function init_hooks() {
+            
+            // AUTO-FLUSH REWRITE RULES (V220 Emergency Fix)
+            add_action('admin_init', function() {
+                if (!get_option('mps_v220_emergency_flush')) {
+                    flush_rewrite_rules();
+                    update_option('mps_v220_emergency_flush', true);
+                    error_log('MPS V220: Emergency Cache Flush Triggered.');
+                }
+            });
+
+            // SECTION 1B: FRONTEND STYLES (MPS Color Scheme)
+            // HIDE ADMIN BAR FOR NON-ADMINS (Sitters & Owners)
+            add_filter('show_admin_bar', function($show) {
+                if (!current_user_can('administrator')) {
+                    return false;
+                }
+                return $show;
+            });
+
+            // FORCE MOBILE MENU TO USE PRIMARY MENU
+            add_filter('wp_nav_menu_args', function($args) {
+                if ( isset($args['theme_location']) && ( $args['theme_location'] == 'mobile_menu' || $args['theme_location'] == 'handheld' ) ) {
+                    $locations = get_nav_menu_locations();
+                    if ( isset($locations['primary']) ) {
+                        $args['menu'] = $locations['primary'];
+                    }
+                }
+                return $args;
+            });
+
+            add_filter('wp_page_menu_args', function($args) {
+                $locations = get_nav_menu_locations();
+                if ( isset($locations['primary']) ) {
+                    $args['menu'] = $locations['primary'];
+                }
+                return $args;
+            });
+
+            add_filter('wp_nav_menu_objects', function($items, $args) {
+                if (is_user_logged_in()) {
+                    foreach ($items as $key => $item) {
+                        // 1. Change "Login" to "Account"
+                        if (stripos($item->title, 'Login') !== false) {
+                            $item->title = 'Account'; 
+                            $item->url = home_url('/account/'); 
+                            $item->classes[] = 'mps-logged-in-account'; 
+                        }
+                        // 2. Hide "Join" / "Become a Sitter"
+                        if (stripos($item->title, 'Join') !== false || stripos($item->title, 'Become a Sitter') !== false) {
+                            unset($items[$key]);
+                        }
+                    }
+                }
+                return $items;
+            }, 10, 2);
+        }
     }
-});
-
-// Include Master Locations List (V76)
-
-$mps_loc_file = plugin_dir_path(__FILE__) . 'includes/mps-locations-au.php';
-
-if (file_exists($mps_loc_file)) {
-
-    require_once $mps_loc_file;
-
-} else {
-
-    // Fallback preventing fatal error if file missing
-
-    if (!function_exists('antigravity_v200_get_valid_locations')) {
-
-        function antigravity_v200_get_valid_locations() { return ['Sydney', 'Melbourne', 'Brisbane', 'Perth', 'Adelaide']; }
-
-    }
-
 }
-
-
-
-// V111: Include Master Suburbs Validation List (Quarantine System) - REVERTED TO V110
-
-/*
-
-$mps_master_file = plugin_dir_path(__FILE__) . 'includes/mps-all-suburbs-master.php';
-
-if (file_exists($mps_master_file)) {
-
-    include_once $mps_master_file;
-
-} else {
-
-    // Fallback stub
-
-    if (!function_exists('antigravity_v200_is_valid_suburb')) {
-
-        function antigravity_v200_is_valid_suburb($s) { return $s; } 
-
-    }
-
-}
-
-*/
-
-if (!function_exists('antigravity_v200_is_valid_suburb')) {
-
-    function antigravity_v200_is_valid_suburb($s) { return $s; } 
-
-}
-
-
-
-// POLYFILL: Ensure Regions function exists (if user has old includes file)
-
-if (!function_exists('antigravity_v200_get_valid_regions')) {
-
-    function antigravity_v200_get_valid_regions() { return []; }
-
-}
-
-
-
-// SECTION 1: CONSTANTS & CONFIGURATION
 
 // ======================================
+// GLOBAL HELPERS & CONSTANTS (Must remain global)
+// ======================================
 
+// Include Master Locations List (V76)
+$mps_loc_file = plugin_dir_path(__FILE__) . 'includes/mps-locations-au.php';
+if (file_exists($mps_loc_file)) {
+    require_once $mps_loc_file;
+} else {
+    if (!function_exists('antigravity_v200_get_valid_locations')) {
+        function antigravity_v200_get_valid_locations() { return ['Sydney', 'Melbourne', 'Brisbane', 'Perth', 'Adelaide']; }
+    }
+}
 
+if (!function_exists('antigravity_v200_is_valid_suburb')) {
+    function antigravity_v200_is_valid_suburb($s) { return $s; } 
+}
 
+if (!function_exists('antigravity_v200_get_valid_regions')) {
+    function antigravity_v200_get_valid_regions() { return []; }
+}
+
+// SECTION 1: CONSTANTS & CONFIGURATION
 if (!defined('MPS_VERSION'))      define('MPS_VERSION', '2.0.0');
-
 if (!defined('MPS_ADMIN_EMAIL'))  define('MPS_ADMIN_EMAIL', 'enquiries@mypetsitters.com.au');
-
-
-
-// SECTION 1B: FRONTEND STYLES (MPS Color Scheme)
-
-// ==============================================
-
-
-
-// HIDE ADMIN BAR FOR NON-ADMINS (Sitters & Owners)
-
-add_filter('show_admin_bar', function($show) {
-
-    if (!current_user_can('administrator')) {
-
-        return false;
-
-    }
-
-    return $show;
-
-});
-
-
-
-// FORCE MOBILE MENU TO USE PRIMARY MENU
-
-add_filter('wp_nav_menu_args', function($args) {
-
-    // Only target the mobile menu location (Astra uses 'mobile_menu' or falls back)
-
-    // If the theme location is 'slide_in_menu', 'mobile_menu', or text domain matches 'astra'
-
-    if ( isset($args['theme_location']) && ( $args['theme_location'] == 'mobile_menu' || $args['theme_location'] == 'handheld' ) ) {
-
-        // Try to get the primary menu object
-
-        $locations = get_nav_menu_locations();
-
-        if ( isset($locations['primary']) ) {
-
-            $args['menu'] = $locations['primary'];
-
-        }
-
-    }
-
-    // Fallback: If no theme location is set (often happens with fallback page menus), 
-
-    // try to force it if we are sure it's the mobile toggle.
-
-    return $args;
-
-});
-
-
-
-add_filter('wp_page_menu_args', function($args) {
-
-    // If we are falling back to page menu, try to switch to primary nav menu instead
-
-    $locations = get_nav_menu_locations();
-
-    if ( isset($locations['primary']) ) {
-
-        $args['menu'] = $locations['primary'];
-
-    }
-
-    return $args;
-
-});
-
-
-
-add_filter('wp_nav_menu_objects', function($items, $args) {
-    if (is_user_logged_in()) {
-        foreach ($items as $key => $item) {
-            // 1. Change "Login" to "Account"
-            if (stripos($item->title, 'Login') !== false) {
-                $item->title = 'Account'; // Change label
-                $item->url = home_url('/account/'); // Change URL
-                $item->classes[] = 'mps-logged-in-account'; // Add class for styling
-            }
-
-            // 2. Hide "Join" / "Become a Sitter" for logged-in users
-            if (stripos($item->title, 'Join') !== false || stripos($item->title, 'Become a Sitter') !== false) {
-                unset($items[$key]);
-            }
-        }
-    } else {
-        // Optional: Ensure "Account" doesn't show if hardcoded (unlikely)
-    }
-    return $items;
-}, 10, 2);
 
 add_action('wp_head', function() {
 
