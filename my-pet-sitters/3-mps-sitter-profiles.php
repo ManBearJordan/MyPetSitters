@@ -224,7 +224,8 @@ function antigravity_v200_display_sitter_profile() {
 }
 
 add_filter('the_content', function($content) {
-    if (is_singular('sitter') && in_the_loop() && is_main_query()) {
+    // FIX V229: Removed strict in_the_loop() check to ensure rendering
+    if (is_singular('sitter') && is_main_query()) {
         return antigravity_v200_display_sitter_profile();
     }
     return $content;
