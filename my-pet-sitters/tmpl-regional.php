@@ -45,6 +45,7 @@ $region_name = $region_term ? $region_term->name : ucwords(str_replace('-', ' ',
                 <span><?= esc_html($region_name) ?></span>
             </div>
 
+            <?php
             // 4. Custom Query for Sitters
             // Filter by: Service AND/OR Suburb
             // V237: Support Smart Router (Suburb vs Service)

@@ -861,47 +861,66 @@ function antigravity_v200_render_homepage($atts) {
                         'ACT' => ['Canberra']
                     ];
 
-                    // 2. LOCATIONS / SUBURBS DATA (Dynamic Active List)
-                    // V109: Fetch ONLY locations that have registered sitters (Comprehensiveness via Database)
-                    $active_suburbs = get_terms([
-                        'taxonomy' => 'mps_city',
-                        'hide_empty' => false, // Show ALL suburbs (V239 Fix)
-                        'orderby' => 'name',
-                        'order' => 'ASC'
-                    ]);
+                    // 2. LOCATIONS / SUBURBS DATA (Dynamic from Sitter Meta)
+                    // We query posts directly because 'mps_city' taxonomy might be empty/unused if users use text fields.
+                    global $wpdb;
                     
-                    // OUTPUT MAJOR CITIES (Manual Top List)
-                    echo '<optgroup label="Major Cities">';
-                    $major_cities = ['Brisbane', 'Sydney', 'Melbourne', 'Perth', 'Adelaide', 'Canberra', 'Hobart', 'Darwin', 'Gold Coast', 'Sunshine Coast', 'Newcastle', 'Wollongong'];
-                    foreach ($major_cities as $city) {
-                        echo '<option value="' . esc_attr($city) . '" data-slug="' . esc_attr(sanitize_title($city)) . '">' . esc_html($city) . '</option>';
-                    }
-                    echo '</optgroup>';
+                    // Get all published sitters
+                    $sitter_posts = $wpdb->get_results("
+                        SELECT ID, post_title 
+                        FROM {$wpdb->posts} 
+                        WHERE post_type = 'sitter' 
+                        AND post_status = 'publish'
+                    ");
 
-                    // OUTPUT REGIONS BY STATE
-                    foreach ($regions_by_state as $state => $regions) {
-                        echo '<optgroup label="' . esc_attr($state . ' Regions') . '">';
-                        foreach ($regions as $region) {
-                             echo '<option value="' . esc_attr($region) . '" data-type="region">' . esc_html($region) . '</option>';
+                    $suburb_options = [];
+
+                    foreach ($sitter_posts as $post) {
+                        $suburb = trim(get_post_meta($post->ID, 'mps_suburb', true));
+                        if (!$suburb) continue;
+
+                        // Skip if we already processed this suburb
+                        if (isset($suburb_options[$suburb])) continue;
+
+                        // Get State (Meta) and Region (Taxonomy) to build the URL
+                        $state = get_post_meta($post->ID, 'mps_state', true);
+                        
+                        // Get Region Name (Try Taxonomy first, then Meta fallback)
+                        $regions = wp_get_post_terms($post->ID, 'mps_region', ['fields' => 'slugs']);
+                        $region_slug = !empty($regions) ? $regions[0] : '';
+                        
+                        if (!$region_slug) {
+                            // Fallback to meta if taxonomy is empty
+                            $region_raw = get_post_meta($post->ID, 'mps_region_name', true); // generic fallback
+                            if ($region_raw) $region_slug = sanitize_title($region_raw);
                         }
-                        echo '</optgroup>';
+
+                        // Validate we have enough to build a link: /regions/{state}/{region}/{suburb}/
+                        if ($state && $region_slug) {
+                            $link = home_url( sprintf(
+                                '/regions/%s/%s/%s/', 
+                                strtolower($state), 
+                                $region_slug, 
+                                sanitize_title($suburb)
+                            ));
+                            
+                            $suburb_options[$suburb] = $link;
+                        }
                     }
 
-                    // OUTPUT ALL AVAILABLE SUBURBS (Dynamic)
-                    if (!empty($active_suburbs) && !is_wp_error($active_suburbs)) {
+                    // Sort A-Z
+                    ksort($suburb_options);
+
+                    // OUTPUT ALL AVAILABLE SUBURBS
+                    if (!empty($suburb_options)) {
                         echo '<optgroup label="Available Locations (A-Z)">';
-                        foreach ($active_suburbs as $term) {
-                            $loc = $term->name;
-                            // Get the actual link to the region page
-                            $link = get_term_link($term); 
-                            
+                        foreach ($suburb_options as $name => $link) {
                             // Check against major cities to avoid dupes
                             foreach ($major_cities as $maj) {
-                                if (strcasecmp($loc, $maj) === 0) continue 2; 
+                                if (strcasecmp($name, $maj) === 0) continue 2; 
                             }
                             
-                            // OUTPUT THE LINK IN THE VALUE
-                            echo '<option value="' . esc_attr($link) . '">' . esc_html($loc) . '</option>';
+                            echo '<option value="' . esc_attr($link) . '">' . esc_html($name) . '</option>';
                         }
                         echo '</optgroup>';
                     }
