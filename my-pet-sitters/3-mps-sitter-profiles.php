@@ -19,11 +19,7 @@ if (!defined('ABSPATH')) exit;
 function antigravity_v200_display_sitter_profile() {
     $post_id = get_queried_object_id();
     
-    // Safety check
-    if (get_post_type($post_id) !== 'sitter') {
-        return '';
-    }
-
+    // FIX V230: Removed redundant post_type check that caused blank pages
     $sitter_user_id = get_post_field('post_author', $post_id);
     
     // Fetch Meta
