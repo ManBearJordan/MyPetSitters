@@ -1,4 +1,4 @@
-hy<?php
+<?php
 /**
  * MPS BOOKING SYSTEM
  * 
