@@ -49,17 +49,37 @@ add_action('template_redirect', function() {
     
     // Handle Regional Service Pages
     if (get_query_var('mps_state') && get_query_var('mps_region_slug') && get_query_var('mps_service_slug')) {
-        $state   = get_query_var('mps_state');
-        $region  = get_query_var('mps_region_slug');
+        $state   = strtoupper(get_query_var('mps_state'));
+        $region  = ucwords(str_replace('-', ' ', get_query_var('mps_region_slug')));
         
-        // FIX: Convert URL slug "new-farm" to DB format "New Farm"
-        // (Applies to Services or Suburbs routed via this segment)
+        // 1. Get the raw slug & normalize it (Fixes "new-farm" -> "New Farm")
         $raw_slug = get_query_var('mps_service_slug');
-        $normalized = ucwords(str_replace('-', ' ', $raw_slug));
+        $normalized_input = ucwords(str_replace('-', ' ', $raw_slug));
+
+        // 2. Load the Suburb Master List to check if this is a location
+        require_once plugin_dir_path(__FILE__) . 'includes/mps-all-suburbs-master.php';
         
-        set_query_var('mps_service_slug', $normalized);
-        $service = $normalized;
+        // 3. The "Smart Switch"
+        // If it's in our master list, it's a SUBURB. If not, it's a SERVICE.
+        $is_suburb = antigravity_v200_is_valid_suburb($normalized_input);
+
+        if ($is_suburb) {
+            // It is a Suburb! (Case B: New Farm)
+            $suburb = $is_suburb; // Use the official capitalized name
+            $service = '';        // Clear service so we don't filter by it
+            
+            // Set query var so the template knows
+            set_query_var('mps_suburb', $suburb);
+            set_query_var('mps_service_slug', ''); // Clear service slug to prevent confusing the template
+            
+        } else {
+            // It is a Service! (Case A: Dog Walking)
+            $suburb = '';
+            $service = $normalized_input;
+            set_query_var('mps_service_slug', $service);
+        }
         
+        // 4. Load the view
         include(plugin_dir_path(__FILE__) . 'tmpl-regional.php');
         exit;
     }

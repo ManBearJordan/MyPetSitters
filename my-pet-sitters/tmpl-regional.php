@@ -45,36 +45,52 @@ $region_name = $region_term ? $region_term->name : ucwords(str_replace('-', ' ',
                 <span><?= esc_html($region_name) ?></span>
             </div>
 
-            <?php
             // 4. Custom Query for Sitters
-            // Filter by: Service AND (Region Term OR Sitter location matches?) 
-            // The plan said: "Filter sitters by State + Region AND Service"
-            // We use the 'mps_region' taxonomy.
+            // Filter by: Service AND/OR Suburb
+            // V237: Support Smart Router (Suburb vs Service)
+            
+            $suburb_name = get_query_var('mps_suburb');
             
             $args = [
                 'post_type'      => 'sitter',
                 'post_status'    => 'publish',
                 'posts_per_page' => 24,
                 'tax_query'      => [
-                    'relation' => 'AND',
-                    [
-                        'taxonomy' => 'mps_service',
-                        'field'    => 'slug',
-                        'terms'    => $service_slug,
-                    ],
-                    [
-                        'taxonomy' => 'mps_region',
-                        'field'    => 'slug',
-                        'terms'    => $region_slug,
-                    ]
+                    'relation' => 'AND'
                 ],
                 'meta_query'     => [
+                    'relation' => 'AND',
                     [
                         'key'     => 'mps_state',
                         'value'   => $state_code,
                         'compare' => '='
                     ]
                 ]
+            ];
+            
+            // Filter by Service (if set)
+            if ($service_slug) {
+                $args['tax_query'][] = [
+                    'taxonomy' => 'mps_service',
+                    'field'    => 'slug',
+                    'terms'    => $service_slug,
+                ];
+            }
+            
+            // Filter by Suburb (if set - V237)
+            if ($suburb_name) {
+                $args['meta_query'][] = [
+                    'key'     => 'mps_suburb',
+                    'value'   => $suburb_name,
+                    'compare' => '=', // Exact match due to Smart Validation
+                ];
+            }
+            
+            // Filter by Region (always set)
+            $args['tax_query'][] = [
+                'taxonomy' => 'mps_region',
+                'field'    => 'slug',
+                'terms'    => $region_slug,
             ];
 
             $q = new WP_Query($args);
