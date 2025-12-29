@@ -865,7 +865,7 @@ function antigravity_v200_render_homepage($atts) {
                     // V109: Fetch ONLY locations that have registered sitters (Comprehensiveness via Database)
                     $active_suburbs = get_terms([
                         'taxonomy' => 'mps_city',
-                        'hide_empty' => true, // Only show if sitters exist
+                        'hide_empty' => false, // Show ALL suburbs (V239 Fix)
                         'orderby' => 'name',
                         'order' => 'ASC'
                     ]);
@@ -892,14 +892,16 @@ function antigravity_v200_render_homepage($atts) {
                         echo '<optgroup label="Available Locations (A-Z)">';
                         foreach ($active_suburbs as $term) {
                             $loc = $term->name;
-                            // Check against major cities to avoid dupes?
-                            // Actually, let's allow dupes if it's the exact string, or filter them.
-                            // Case-insensitive check
+                            // Get the actual link to the region page
+                            $link = get_term_link($term); 
+                            
+                            // Check against major cities to avoid dupes
                             foreach ($major_cities as $maj) {
                                 if (strcasecmp($loc, $maj) === 0) continue 2; 
                             }
                             
-                            echo '<option value="' . esc_attr($loc) . '">' . esc_html($loc) . '</option>';
+                            // OUTPUT THE LINK IN THE VALUE
+                            echo '<option value="' . esc_attr($link) . '">' . esc_html($loc) . '</option>';
                         }
                         echo '</optgroup>';
                     }
@@ -1162,27 +1164,35 @@ function antigravity_v200_render_homepage($atts) {
     function mpsSearch(form) {
         var cityInput = form.city.value.trim();
         var service = form.service.value;
+        
         if (!cityInput) {
             alert('Please enter a city or suburb');
             return false;
         }
 
-        // V105: Dropdown Logic
         var select = form.city;
         var selectedOpt = select.options[select.selectedIndex];
         var slug = selectedOpt.getAttribute('data-slug');
-        var cityName = selectedOpt.value;
+        var value = selectedOpt.value;
 
+        // CHECK 1: Is the value a full URL? (Fixes Runnymede/Suburbs)
+        // If it looks like a link, go there directly.
+        if (value.indexOf('http') === 0 || value.indexOf('/') === 0) {
+            window.location.href = value;
+            return false;
+        }
+
+        // CHECK 2: Is it a Major City with a slug?
         if (slug) {
-            // MAJOR CITY -> Landing Page
             var url = '/' + slug + '/';
             if (service) url += service + '/';
             window.location.href = url;
-        } else {
-            // REGION -> Search Results
-            var searchUrl = '/?s=' + encodeURIComponent(cityName) + '&post_type=sitter';
-            window.location.href = searchUrl;
-        }
+            return false;
+        } 
+        
+        // CHECK 3: Fallback to Search (Only if no link found)
+        var searchUrl = '/?s=' + encodeURIComponent(value) + '&post_type=sitter';
+        window.location.href = searchUrl;
         
         return false;
     }
