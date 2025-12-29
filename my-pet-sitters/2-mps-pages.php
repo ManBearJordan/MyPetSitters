@@ -51,7 +51,14 @@ add_action('template_redirect', function() {
     if (get_query_var('mps_state') && get_query_var('mps_region_slug') && get_query_var('mps_service_slug')) {
         $state   = get_query_var('mps_state');
         $region  = get_query_var('mps_region_slug');
-        $service = get_query_var('mps_service_slug');
+        
+        // FIX: Convert URL slug "new-farm" to DB format "New Farm"
+        // (Applies to Services or Suburbs routed via this segment)
+        $raw_slug = get_query_var('mps_service_slug');
+        $normalized = ucwords(str_replace('-', ' ', $raw_slug));
+        
+        set_query_var('mps_service_slug', $normalized);
+        $service = $normalized;
         
         include(plugin_dir_path(__FILE__) . 'tmpl-regional.php');
         exit;
