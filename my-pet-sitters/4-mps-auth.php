@@ -30,10 +30,83 @@ function antigravity_v200_record_login_attempt($email, $success = false) {
 // VIRTUAL AUTH PAGES (Join, Login, etc.)
 // ===========================================================================
 
-add_action('init', function() {
-    add_rewrite_rule('^join/?$', 'index.php?mps_auth_page=join', 'top');
-    add_rewrite_rule('^login/?$', 'index.php?mps_auth_page=login', 'top');
-});
+
+// FIX V231: Handle Registration on INIT (before headers)
+add_action('init', 'antigravity_v200_handle_registration_post');
+
+function antigravity_v200_handle_registration_post() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['mps_reg_nonce'])) {
+        // Ensure virtual pages still load
+        add_rewrite_rule('^join/?$', 'index.php?mps_auth_page=join', 'top');
+        add_rewrite_rule('^login/?$', 'index.php?mps_auth_page=login', 'top');
+        return;
+    }
+
+    // Honey Pot
+    if (!empty($_POST['website'])) return; 
+
+    if (!wp_verify_nonce($_POST['mps_reg_nonce'], 'mps_register')) {
+        wp_die('Security check failed. Please go back and try again.');
+    }
+
+    $active_tab = $_POST['mps_tab'] ?? 'owner';
+    $name  = sanitize_text_field($_POST['name'] ?? '');
+    $email = sanitize_email($_POST['email'] ?? '');
+    $pass  = $_POST['password'] ?? '';
+    $pass2 = $_POST['password_confirm'] ?? '';
+    
+    $error_code = '';
+
+    // Validation
+    if (!$name) $error_code = 'missing_name';
+    elseif (!is_email($email)) $error_code = 'invalid_email';
+    elseif (email_exists($email)) $error_code = 'email_exists';
+    elseif (strlen($pass) < 8) $error_code = 'password_short';
+    elseif ($pass !== $pass2) $error_code = 'password_mismatch';
+
+    // If Error, Redirect Back
+    if ($error_code) {
+        $referer = remove_query_arg(['registered', 'mps_error'], wp_get_referer());
+        wp_safe_redirect(add_query_arg(['mps_error' => $error_code, 'mps_tab' => $active_tab], $referer));
+        exit;
+    }
+
+    // Create User
+    $user_id = wp_create_user($email, $pass, $email);
+    
+    if (is_wp_error($user_id)) {
+        $referer = remove_query_arg(['registered', 'mps_error'], wp_get_referer());
+        wp_safe_redirect(add_query_arg(['mps_error' => 'generic', 'mps_tab' => $active_tab], $referer));
+        exit;
+    }
+
+    // Success Update
+    wp_update_user([
+        'ID'           => $user_id,
+        'display_name' => $name,
+        'nickname'     => $name,
+        'first_name'   => explode(' ', $name)[0],
+    ]);
+
+    $is_sitter = ($active_tab === 'sitter');
+    $user = new WP_User($user_id);
+    $user->set_role($is_sitter ? 'pro' : 'subscriber');
+
+    // Init Login & Roles
+    wp_set_current_user($user_id);
+    wp_set_auth_cookie($user_id, true);
+    
+    // Notify Admin
+    $admin_email = defined('MPS_ADMIN_EMAIL') ? MPS_ADMIN_EMAIL : get_option('admin_email');
+    $role_label = $is_sitter ? 'Sitter' : 'Owner';
+    wp_mail($admin_email, "New $role_label Registration: $name", 
+        "Name: $name\nEmail: $email\nRole: $role_label");
+
+    // Redirect Success
+    $redirect_path = $is_sitter ? '/edit-profile/' : '/account/';
+    wp_safe_redirect(home_url($redirect_path) . '?registered=1');
+    exit;
+}
 
 add_filter('query_vars', function($vars) {
     $vars[] = 'mps_auth_page';
@@ -207,17 +280,15 @@ add_shortcode('mps_registration', 'antigravity_v200_render_register');
 // Converted to named function (V120 Fix)
 function antigravity_v200_render_register($atts) {
     $a = shortcode_atts([
-        'role'        => '',       // Empty = show both tabs, 'pro' = sitters only, 'subscriber' = owners only
+        'role'        => '',       
         'redirect'    => '/account/',
-        'default_tab' => 'owner',  // Which tab to show first if both are visible
+        'default_tab' => 'owner',  
     ], $atts, 'mps_register');
     
-    // FIX (Merged from fix-tabs.php): Force both tabs if Sitter is default
     if ($a['default_tab'] === 'sitter') {
         $a['role'] = '';
     }
     
-    // Already logged in
     if (is_user_logged_in()) {
         $dest = esc_url(home_url($a['redirect']));
         return '<div class="mps-notice mps-notice-info" style="padding:16px;background:#e8f4f8;border-radius:8px;margin-bottom:16px;">
@@ -225,87 +296,25 @@ function antigravity_v200_render_register($atts) {
         </div>';
     }
     
+    // V231: Handle Errors via Query Args (since POST is handled on init)
     $errors = [];
-    $active_tab = $_POST['mps_tab'] ?? $a['default_tab']; // Use default tab if no post
-    $values = ['name' => '', 'email' => ''];
-    
-    // Process form submission
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mps_reg_nonce'])) {
-        // Honeypot check
-        if (!empty($_POST['website'])) {
-            return ''; // Silent fail for bots
-        }
-        
-        if (!wp_verify_nonce($_POST['mps_reg_nonce'], 'mps_register')) {
-            $errors[] = 'Security check failed. Please reload and try again.';
-        } else {
-            $values['name']  = sanitize_text_field($_POST['name'] ?? '');
-            $values['email'] = sanitize_email($_POST['email'] ?? '');
-            $pass  = $_POST['password'] ?? '';
-            $pass2 = $_POST['password_confirm'] ?? '';
-            $is_sitter = ($active_tab === 'sitter');
-            
-            // Validation
-            if (!$values['name']) {
-                $errors[] = 'Please enter your full name.';
-            }
-            if (!is_email($values['email'])) {
-                $errors[] = 'Please enter a valid email address.';
-            }
-            if (email_exists($values['email'])) {
-                $errors[] = 'An account with this email already exists. <a href="/login/">Log in instead</a>';
-            }
-            if (strlen($pass) < 8) {
-                $errors[] = 'Password must be at least 8 characters.';
-            }
-            if ($pass !== $pass2) {
-                $errors[] = 'Passwords don\'t match.';
-            }
-            
-            // Create user
-            if (!$errors) {
-                $user_id = wp_create_user($values['email'], $pass, $values['email']);
-                
-                if (is_wp_error($user_id)) {
-                    $errors[] = 'Could not create account. Please try again.';
-                } else {
-                    // Update user details
-                    wp_update_user([
-                        'ID'           => $user_id,
-                        'display_name' => $values['name'],
-                        'nickname'     => $values['name'],
-                        'first_name'   => explode(' ', $values['name'])[0],
-                    ]);
-                    
-                    // Set role (Slug is 'pro', Display Name is 'Sitter')
-                    $user = new WP_User($user_id);
-                    $user->set_role($is_sitter ? 'pro' : 'subscriber');
-                    
-                    // Log in the user
-                    wp_set_current_user($user_id);
-                    wp_set_auth_cookie($user_id, true);
-                    
-                    // Redirect sitters to profile creation, owners to account
-                    $redirect_to = $is_sitter ? '/edit-profile/' : '/account/';
-
-                    // Notify Admin
-                    $admin_email = defined('MPS_ADMIN_EMAIL') ? MPS_ADMIN_EMAIL : 'enquiries@mypetsitters.com.au';
-                    $role_label = $is_sitter ? 'Sitter' : 'Owner';
-                    wp_mail($admin_email, "New $role_label Registration: " . $values['name'], 
-                        "A new user has registered:\n\nName: {$values['name']}\nEmail: {$values['email']}\nRole: $role_label\n\nManage users: " . admin_url('users.php'));
-
-                    wp_safe_redirect(home_url($redirect_to) . '?registered=1');
-                    exit;
-                }
-            }
+    if (isset($_GET['mps_error'])) {
+        switch ($_GET['mps_error']) {
+            case 'missing_name': $errors[] = 'Please enter your full name.'; break;
+            case 'invalid_email': $errors[] = 'Please enter a valid email address.'; break;
+            case 'email_exists': $errors[] = 'Account exists. <a href="/login/">Log in instead</a>'; break;
+            case 'password_short': $errors[] = 'Password must be at least 8 characters.'; break;
+            case 'password_mismatch': $errors[] = 'Passwords do not match.'; break;
+            case 'generic': $errors[] = 'Could not create account. Please try again.'; break;
         }
     }
-    
+
+    $active_tab = $_GET['mps_tab'] ?? $a['default_tab'];
     $show_owners = ($a['role'] === '' || $a['role'] === 'subscriber');
     $show_sitters = ($a['role'] === '' || $a['role'] === 'pro');
     $show_tabs = $show_owners && $show_sitters;
     
-    ob_start();
+    ob_start(); // Start Output Buffering
     
     // Error display
     if ($errors) {

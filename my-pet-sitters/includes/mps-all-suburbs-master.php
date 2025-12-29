@@ -72,6 +72,7 @@ function antigravity_v200_get_master_suburbs_list() {
  * Validate Suburb
  * Returns TRUE if suburb is in the Master List (Case Insensitive).
  */
+if (!function_exists('antigravity_v200_is_valid_suburb')) {
 function antigravity_v200_is_valid_suburb($suburb_input) {
     if (empty($suburb_input)) return false;
     
@@ -84,6 +85,7 @@ function antigravity_v200_is_valid_suburb($suburb_input) {
     }
     
     return false; // Not found
+}
 }
 
 

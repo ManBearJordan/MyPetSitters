@@ -53,6 +53,7 @@ function antigravity_v200_ajax_toggle_date() {
 // 3. DASHBOARD EDITOR SHORTCODE
 // [mps_availability_calendar] SHORTCODE
 add_shortcode('mps_availability_calendar', 'antigravity_v200_calendar_shortcode');
+add_shortcode('mps_availability_editor', 'antigravity_v200_calendar_shortcode'); // Alias V232 Fix
 function antigravity_v200_calendar_shortcode($atts) {
     if (!is_user_logged_in()) return '';
     

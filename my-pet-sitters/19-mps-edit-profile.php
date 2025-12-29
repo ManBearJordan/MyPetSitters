@@ -138,6 +138,39 @@ function antigravity_v200_edit_profile_shortcode($atts) {
     if (isset($_GET['error_msg'])) {
         echo '<div style="background:#f8d7da;border:1px solid #f5c6cb;color:#721c24;padding:12px;border-radius:8px;margin-bottom:16px;">' . esc_html($_GET['error_msg']) . '</div>';
     }
+
+    // CHECK COMPLETENESS (V233 Alert)
+    $incomplete = [];
+    if (empty($values['city'])) {
+        $incomplete[] = 'Common City';
+    }
+    if (empty($values['services'])) {
+        $incomplete[] = 'At least one Service';
+    } else {
+        // Check for at least one price
+        $has_price = false;
+        foreach ($values['services'] as $svc) {
+            $slug = sanitize_title($svc);
+            if (!empty($values['prices'][$slug])) {
+                $has_price = true; 
+                break;
+            }
+        }
+        if (!$has_price) {
+            $incomplete[] = 'Pricing for your services';
+        }
+    }
+
+    if (!empty($incomplete)) {
+        echo '<div style="background:#fff3cd;border:1px solid #ffeeba;color:#856404;padding:16px;border-radius:8px;margin-bottom:24px;">
+            <h4 style="margin-top:0;margin-bottom:8px;">⚠️ Profile Incomplete</h4>
+            <p style="margin:0;">Your profile may not be visible in search results until you complete the following:</p>
+            <ul style="margin:8px 0 0 20px;">';
+            foreach ($incomplete as $item) {
+                echo '<li>' . esc_html($item) . '</li>';
+            }
+        echo '</ul></div>';
+    }
     ?>
     
     <h3>Edit Profile</h3>
@@ -445,6 +478,9 @@ function antigravity_v200_handle_profile_save() {
         wp_die('Security check failed');
     }
     
+    // Load Master List for Validation
+    require_once plugin_dir_path(__FILE__) . 'includes/mps-all-suburbs-master.php';
+
     $current_user = wp_get_current_user();
     
     // ADMIN OVERRIDE
@@ -545,6 +581,22 @@ function antigravity_v200_handle_profile_save() {
     $show_phone = isset($_POST['show_phone']) ? 1 : 0;
     $show_email = isset($_POST['show_email']) ? 1 : 0;
     
+    // V234: SMART SUBURB VALIDATION
+    $suburb_input = sanitize_text_field($_POST['suburb'] ?? '');
+    $final_suburb = '';
+
+    if ($suburb_input) {
+        $valid_suburb = antigravity_v200_is_valid_suburb($suburb_input);
+        
+        if ($valid_suburb) {
+            $final_suburb = $valid_suburb; // Save the Auto-Corrected version (e.g. "bondi" -> "Bondi")
+        } else {
+            // BLOCK S SAVE
+            wp_redirect(add_query_arg('error_msg', 'Invalid Suburb. Please check spelling.', $redirect_url));
+            exit;
+        }
+    }
+
     if (!$name || !$bio || empty($services)) {
         wp_redirect(add_query_arg('error_msg', 'Missing required fields (Name, Bio, Services)', $redirect_url));
         exit;
@@ -589,7 +641,11 @@ function antigravity_v200_handle_profile_save() {
         update_post_meta($post_id, 'mps_phone', sanitize_text_field($_POST['phone']));
         update_post_meta($post_id, 'mps_city', sanitize_text_field($_POST['city']));
 
-        update_post_meta($post_id, 'mps_suburb', sanitize_text_field($_POST['suburb']));
+        update_post_meta($post_id, 'mps_city', sanitize_text_field($_POST['city']));
+
+        update_post_meta($post_id, 'mps_suburb', $final_suburb); // Saved Validated Version
+        
+        // V75 Updates
         
         // V75 Updates
         update_post_meta($post_id, 'mps_state', sanitize_text_field($_POST['state']));
