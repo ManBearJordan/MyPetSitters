@@ -25,7 +25,13 @@ For EVERY coding request, you must execute the following 3-PHASE PROCESS sequent
 1. **No Placeholders:** Never use `// ... code here`. Write full functions.
 2. **WordPress Native:** Use `wpdb`, `get_post_meta`, `wp_send_json_success`.
 3. **Formatting:** Start with `<?php` if replacing a full file.
+CRITICAL OUTPUT RULE: If a file is larger than 50 lines, NEVER output the full file content in your response.
 
+CORRECT: Output only the specific functions or lines that changed.
+
+CORRECT: Use sed or diff format if applying patches.
+
+INCORRECT: rewriting the entire file (this causes truncation and data loss).
 ---
 
 ### PHASE 3: THE AUDITOR (Self-Correction)
